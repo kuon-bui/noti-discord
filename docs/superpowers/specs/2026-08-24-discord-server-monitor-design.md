@@ -169,7 +169,11 @@ Quy trình:
 `statsSince(targetId, since)` · `deleteOlderThan(date)`
 
 `IncidentsRepo`: `open(targetId, reason, at)` · `close(targetId, at)` ·
-`findOpen(targetId)` · `listRecent(targetId, limit)` · `sumDowntime(targetId, since)`
+`findOpen(targetId)` · `listRecent(targetId, limit)` · `listOverlapping(targetId, since)`
+
+Repo **không** tự tính tổng downtime. Nó trả danh sách incident chồng lấn khoảng
+thời gian; phép cộng và cắt biên là hàm thuần `sumDowntimeMs` trong `digest/`. Số
+dòng incident luôn nhỏ nên tính ở JS rẻ hơn và dễ test hơn nhiều so với nhồi vào SQL.
 
 `MetaRepo`: `get(key)` · `set(key, value)`
 
@@ -236,7 +240,7 @@ có giới hạn (mặc định 5 concurrent), bỏ qua target đang pause. Khô
 - **Trách nhiệm:** tính số liệu, quyết định đã tới lúc gửi chưa, dọn dữ liệu cũ.
 - **Interface:** `buildDigest(stats: TargetStats[], range): DigestReport` (thuần) ·
   `maybeSendDigest(now)`
-- **Phân vai rõ:** `ChecksRepo.statsSince` / `IncidentsRepo.sumDowntime` trả **số
+- **Phân vai rõ:** `ChecksRepo.statsSince` / `IncidentsRepo.listOverlapping` trả **số
   liệu thô** (đếm check, tổng latency, số incident, tổng downtime). `buildDigest`
   là hàm thuần nhận số liệu thô đó và tính ra uptime %, latency trung bình, xếp
   hạng — không tự truy vấn DB. Nhờ vậy `/uptime` (một target, range 24h/7d/30d) và
