@@ -8,7 +8,7 @@ import {
 } from '../../src/bot/validate.js'
 
 describe('validateName', () => {
-  it.each(['web', 'web-prod', 'api2', 'a'])('nhận %o', (name) => {
+  it.each(['web', 'web-prod', 'api2', 'a', 'a'.repeat(32)])('nhận %o', (name) => {
     expect(validateName(name)).toBe(name)
   })
 

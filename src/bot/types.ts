@@ -29,6 +29,7 @@ export type InteractionLike = {
     getChannel(name: string): ChannelOption | null
   }
   reply(payload: InteractionReply): Promise<unknown>
+  followUp(payload: InteractionReply): Promise<unknown>
   deferReply(payload?: InteractionReply): Promise<unknown>
   editReply(payload: InteractionReply): Promise<unknown>
 }

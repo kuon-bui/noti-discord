@@ -12,6 +12,7 @@ import { silentLogger } from '../../../src/shared/logger.js'
 
 function interaction(commandName: string, name?: string) {
   const replies: InteractionReply[] = []
+  const followUps: InteractionReply[] = []
   const value: InteractionLike = {
     commandName,
     user: { id: 'admin-1' },
@@ -24,13 +25,17 @@ function interaction(commandName: string, name?: string) {
       replies.push(payload)
       return {}
     },
+    followUp: async (payload) => {
+      followUps.push(payload)
+      return {}
+    },
     deferReply: async () => ({}),
     editReply: async (payload) => {
       replies.push(payload)
       return {}
     },
   }
-  return { interaction: value, replies }
+  return { interaction: value, replies, followUps }
 }
 
 let context: CommandContext
@@ -136,7 +141,7 @@ describe('/list', () => {
     expect(content).not.toContain('top-secret')
   })
 
-  it('không vượt giới hạn 2000 ký tự của reply Discord', async () => {
+  it('chia trang để liệt kê đủ target mà không reply nào vượt giới hạn Discord', async () => {
     for (let index = 0; index < 32; index++) {
       context.targets.create({
         name: `target-${index}`,
@@ -147,8 +152,31 @@ describe('/list', () => {
         createdAt: '2026-08-24T00:00:00.000Z',
       })
     }
+    const { interaction: value, replies, followUps } = interaction('list')
+    await listCommand.execute(context, value)
+    const contents = [...replies, ...followUps].map((reply) => reply.content ?? '')
+    expect(contents).toHaveLength(4)
+    expect(contents.every((content) => content.length <= 2_000)).toBe(true)
+    for (let index = 0; index < 32; index++) {
+      expect(contents.join('\n')).toContain(`target-${index}`)
+    }
+  })
+
+  it('không in URL raw không parse được từ dữ liệu legacy', async () => {
+    context.targets.create({
+      name: 'legacy',
+      url: 'not-a-url?token=top-secret&password=hidden',
+      intervalSeconds: 60,
+      timeoutMs: 10_000,
+      createdBy: 'u1',
+      createdAt: '2026-08-24T00:00:00.000Z',
+    })
     const { interaction: value, replies } = interaction('list')
     await listCommand.execute(context, value)
-    expect(replies[0]?.content?.length).toBeLessThanOrEqual(2_000)
+    const content = replies[0]?.content ?? ''
+    expect(content).toContain('<URL không hợp lệ>')
+    expect(content).not.toContain('token')
+    expect(content).not.toContain('top-secret')
+    expect(content).not.toContain('password')
   })
 })

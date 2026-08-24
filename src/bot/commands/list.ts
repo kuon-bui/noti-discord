@@ -10,6 +10,8 @@ const STATUS_ICON: Record<string, string> = {
 }
 
 const MAX_REPLY_CONTENT = 2_000
+const MAX_ROW_CONTENT = 1_800
+const MAX_DISPLAY_URL = 1_000
 
 function isPaused(target: Target, now: Date): boolean {
   return target.pausedUntil !== null && Date.parse(target.pausedUntil) > now.getTime()
@@ -19,16 +21,38 @@ function displayUrl(value: string): string {
   try {
     const parsed = new URL(value)
     const redactedSuffix = parsed.search || parsed.hash ? '?…' : ''
-    return `${parsed.protocol}//${parsed.host}${parsed.pathname}${redactedSuffix}`
+    const displayed = `${parsed.protocol}//${parsed.host}${parsed.pathname}${redactedSuffix}`
+    return truncateText(displayed, MAX_DISPLAY_URL)
   } catch {
-    return value
+    return '<URL không hợp lệ>'
   }
 }
 
-function truncateReply(content: string): string {
-  return content.length <= MAX_REPLY_CONTENT
+function truncateText(content: string, maxLength: number): string {
+  return content.length <= maxLength
     ? content
-    : `${content.slice(0, MAX_REPLY_CONTENT - 1)}…`
+    : `${content.slice(0, maxLength - 1)}…`
+}
+
+function paginateRows(total: number, rows: readonly string[]): string[] {
+  const firstHeader = `**${total} target đang theo dõi**`
+  const nextHeader = `**${total} target đang theo dõi (tiếp)**`
+  const pages: string[] = []
+  let page = firstHeader
+
+  for (const row of rows) {
+    const candidate = `${page}\n${row}`
+    if (candidate.length <= MAX_REPLY_CONTENT) {
+      page = candidate
+      continue
+    }
+
+    pages.push(page)
+    page = `${nextHeader}\n${row}`
+  }
+
+  pages.push(page)
+  return pages
 }
 
 export const listCommand: Command = {
@@ -50,11 +74,16 @@ export const listCommand: Command = {
     const rows = all.map((target) => {
       const icon = STATUS_ICON[target.currentStatus] ?? '⚪'
       const tag = isPaused(target, now) ? ' (paused)' : ''
-      return `${icon} ${target.name} — ${displayUrl(target.url)} — mỗi ${target.intervalSeconds}s${tag}`
+      return truncateText(
+        `${icon} ${target.name} — ${displayUrl(target.url)} — mỗi ${target.intervalSeconds}s${tag}`,
+        MAX_ROW_CONTENT,
+      )
     })
 
-    await interaction.reply({
-      content: truncateReply(`**${all.length} target đang theo dõi**\n${rows.join('\n')}`),
-    })
+    const [firstPage, ...followingPages] = paginateRows(all.length, rows)
+    await interaction.reply({ content: firstPage })
+    for (const page of followingPages) {
+      await interaction.followUp({ content: page })
+    }
   },
 }

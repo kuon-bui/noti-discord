@@ -23,6 +23,10 @@ function fakeInteraction(commandName: string, userId: string) {
       replies.push(payload)
       return {}
     },
+    followUp: async (payload) => {
+      replies.push(payload)
+      return {}
+    },
     deferReply: async () => ({}),
     editReply: async (payload) => {
       replies.push(payload)
