@@ -1,3 +1,6 @@
+# Worktree cho việc thực thi plan bằng subagent-driven-development
+.worktrees/
+
 # Dependencies
 node_modules/
 
