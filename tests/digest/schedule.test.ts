@@ -1,0 +1,178 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import { openTestDb } from '../../src/db/connection.js'
+import { makeChecksRepo } from '../../src/db/checks.repo.js'
+import { makeIncidentsRepo } from '../../src/db/incidents.repo.js'
+import { makeMetaRepo } from '../../src/db/meta.repo.js'
+import { applyMigrations } from '../../src/db/migrate.js'
+import { makeTargetsRepo } from '../../src/db/targets.repo.js'
+import { LAST_DIGEST_KEY, makeDigestJob } from '../../src/digest/schedule.js'
+import { silentLogger } from '../../src/shared/logger.js'
+import type { AlertMessage } from '../../src/shared/types.js'
+
+type Sent = { msg: AlertMessage; channelId: string }
+
+async function setup(nowIso: string, options: { failNotify?: boolean } = {}) {
+  const { db } = openTestDb()
+  await applyMigrations(db)
+
+  const targets = makeTargetsRepo(db)
+  const checks = makeChecksRepo(db)
+  const incidents = makeIncidentsRepo(db)
+  const meta = makeMetaRepo(db)
+  const sent: Sent[] = []
+
+  const job = makeDigestJob({
+    targets,
+    checks,
+    incidents,
+    meta,
+    notifier: {
+      send: async (message, channelId) => {
+        if (options.failNotify) throw new Error('Discord sập')
+        sent.push({ msg: message, channelId })
+      },
+    },
+    config: { digestHourLocal: 9, digestChannelId: 'digest-chan', checkRetentionDays: 30 },
+    clock: () => new Date(nowIso),
+    logger: silentLogger,
+  })
+
+  return { targets, checks, incidents, meta, job, sent }
+}
+
+function seed(targets: ReturnType<typeof makeTargetsRepo>, name: string) {
+  return targets.create({
+    name,
+    url: `https://${name}.test`,
+    intervalSeconds: 60,
+    timeoutMs: 10_000,
+    createdBy: 'u1',
+    createdAt: '2026-08-24T00:00:00.000Z',
+  })
+}
+
+const AT_9AM_VN = '2026-08-24T02:00:00.000Z'
+const AT_8AM_VN = '2026-08-24T01:00:00.000Z'
+const AT_2PM_VN = '2026-08-24T07:00:00.000Z'
+
+describe('digestJob.maybeSend', () => {
+  it('chưa tới giờ thì không gửi', async () => {
+    const context = await setup(AT_8AM_VN)
+    const result = await context.job.maybeSend()
+    expect(result.sent).toBe(false)
+    expect(result.reason).toMatch(/chưa tới giờ/)
+    expect(context.sent).toHaveLength(0)
+  })
+
+  it('đúng giờ và chưa gửi hôm nay thì gửi', async () => {
+    const context = await setup(AT_9AM_VN)
+    seed(context.targets, 'web')
+    const result = await context.job.maybeSend()
+    expect(result.sent).toBe(true)
+    expect(context.sent).toHaveLength(1)
+    expect(context.sent[0]?.channelId).toBe('digest-chan')
+    expect(context.sent[0]?.msg.kind).toBe('digest')
+  })
+
+  it('ghi ngày đã gửi vào meta theo lịch VN', async () => {
+    const context = await setup(AT_9AM_VN)
+    await context.job.maybeSend()
+    expect(context.meta.get(LAST_DIGEST_KEY)).toBe('2026-08-24')
+  })
+
+  it('gọi lần hai trong cùng ngày thì không gửi lại', async () => {
+    const context = await setup(AT_9AM_VN)
+    await context.job.maybeSend()
+    const second = await context.job.maybeSend()
+    expect(second.sent).toBe(false)
+    expect(second.reason).toMatch(/đã gửi/)
+    expect(context.sent).toHaveLength(1)
+  })
+
+  it('restart lúc 14h mà sáng chưa gửi thì vẫn gửi bù', async () => {
+    const context = await setup(AT_2PM_VN)
+    const result = await context.job.maybeSend()
+    expect(result.sent).toBe(true)
+  })
+
+  it('meta ghi ngày hôm qua thì hôm nay vẫn gửi', async () => {
+    const context = await setup(AT_9AM_VN)
+    context.meta.set(LAST_DIGEST_KEY, '2026-08-23')
+    expect((await context.job.maybeSend()).sent).toBe(true)
+  })
+
+  it('gửi thất bại thì KHÔNG ghi meta, để lần tick sau thử lại', async () => {
+    const context = await setup(AT_9AM_VN, { failNotify: true })
+    await expect(context.job.maybeSend()).rejects.toThrow('Discord sập')
+    expect(context.meta.get(LAST_DIGEST_KEY)).toBeNull()
+  })
+
+  it('không có target nào thì vẫn gửi báo cáo rỗng', async () => {
+    const context = await setup(AT_9AM_VN)
+    expect((await context.job.maybeSend()).sent).toBe(true)
+    expect(context.sent[0]?.msg.description).toContain('Chưa có target')
+  })
+
+  it('đánh dấu target đang pause', async () => {
+    const context = await setup(AT_9AM_VN)
+    const target = seed(context.targets, 'staging')
+    context.targets.setPause(target.id, '2026-08-25T00:00:00.000Z')
+    await context.job.maybeSend()
+    expect(context.sent[0]?.msg.description).toContain('paused')
+  })
+
+  it('target hết hạn pause thì không còn nhãn paused', async () => {
+    const context = await setup(AT_9AM_VN)
+    const target = seed(context.targets, 'staging')
+    context.targets.setPause(target.id, '2026-08-24T01:00:00.000Z')
+    await context.job.maybeSend()
+    expect(context.sent[0]?.msg.description).not.toContain('paused')
+  })
+
+  it('dọn check cũ hơn CHECK_RETENTION_DAYS và giữ check mới', async () => {
+    const context = await setup(AT_9AM_VN)
+    const target = seed(context.targets, 'web')
+    context.checks.insert({
+      targetId: target.id,
+      checkedAt: '2026-06-01T00:00:00.000Z',
+      status: 'UP',
+      latencyMs: 100,
+    })
+    context.checks.insert({
+      targetId: target.id,
+      checkedAt: '2026-08-24T01:00:00.000Z',
+      status: 'UP',
+      latencyMs: 100,
+    })
+
+    await context.job.maybeSend()
+
+    const left = context.checks.listRecent(target.id, 10)
+    expect(left).toHaveLength(1)
+    expect(left[0]?.checkedAt).toBe('2026-08-24T01:00:00.000Z')
+  })
+
+  it('báo cáo tính uptime từ dữ liệu 24 giờ gần nhất', async () => {
+    const context = await setup(AT_9AM_VN)
+    const target = seed(context.targets, 'web')
+    context.checks.insert({
+      targetId: target.id,
+      checkedAt: '2026-08-23T20:00:00.000Z',
+      status: 'UP',
+      latencyMs: 100,
+    })
+    context.checks.insert({
+      targetId: target.id,
+      checkedAt: '2026-08-24T01:00:00.000Z',
+      status: 'DOWN',
+    })
+    context.checks.insert({
+      targetId: target.id,
+      checkedAt: '2026-08-20T00:00:00.000Z',
+      status: 'DOWN',
+    })
+
+    await context.job.maybeSend()
+    expect(context.sent[0]?.msg.description).toContain('50%')
+  })
+})
