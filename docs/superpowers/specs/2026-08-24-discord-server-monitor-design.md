@@ -15,7 +15,9 @@ sách endpoint bằng slash command ngay trong Discord.
 |---|---|
 | Runtime | Node.js 25 + TypeScript, ESM |
 | Discord | discord.js v14, bot gateway (process 24/7) |
-| Lưu trữ | SQLite qua `node:sqlite` (built-in, stability 1.2, không cần flag, không native build) |
+| Lưu trữ | SQLite qua `better-sqlite3` 13 (driver native, có prebuild) |
+| ORM / query | Drizzle ORM (`drizzle-orm/better-sqlite3`) — repo dùng query builder có type |
+| Migration | `drizzle-kit` — schema-first, migration tự sinh bằng diff |
 | Loại check | HTTP/HTTPS: status code + latency |
 | Chính sách alert | Chỉ khi đổi trạng thái UP↔DOWN. DEGRADED chỉ ghi DB, không alert |
 | Báo cáo | Digest hằng ngày 09:00 `Asia/Ho_Chi_Minh`, vào channel digest riêng |
@@ -80,11 +82,16 @@ Mọi logic quyết định là hàm thuần (`evaluate`, `state-machine`, `embe
 ### Cấu trúc thư mục
 
 ```
+drizzle.config.ts
+drizzle/                       <- migration do drizzle-kit sinh, COMMIT vào git
+  0000_init.sql
+  meta/_journal.json
 src/
   index.ts
   config.ts
   db/
-    connection.ts  migrations.ts
+    schema.ts                  <- nguồn sự thật duy nhất của schema
+    connection.ts  migrate.ts
     targets.repo.ts  checks.repo.ts  incidents.repo.ts  meta.repo.ts
   monitor/
     probe.ts  http-probe.ts  evaluate.ts  state-machine.ts  runner.ts  scheduler.ts
@@ -114,12 +121,46 @@ tests/
 
 ### M2 · db
 
-- **Trách nhiệm:** mở SQLite, chạy migration, cung cấp repository theo bảng.
+- **Trách nhiệm:** mở SQLite, áp migration, cung cấp repository theo bảng.
   Không chứa logic nghiệp vụ.
-- **Interface:** `openDb(path)`, `runMigrations(db)`, `TargetsRepo`, `ChecksRepo`,
-  `IncidentsRepo`, `MetaRepo`.
-- **Phụ thuộc:** `node:sqlite`, config.
-- **Repo trả plain object có kiểu**, không trả row SQLite thô.
+- **Interface:** `openDb(config)` → `{ raw: Database, db: DrizzleDb }` ·
+  `applyMigrations(db)` · `TargetsRepo` · `ChecksRepo` · `IncidentsRepo` · `MetaRepo`.
+- **Phụ thuộc:** `better-sqlite3`, `drizzle-orm`, config.
+- **Repo trả plain object có kiểu** (suy ra từ schema Drizzle), không trả row thô.
+- **Repo dùng query builder của Drizzle**, không nối chuỗi SQL. Đổi tên cột trong
+  `schema.ts` là TypeScript báo lỗi ở mọi repo dùng cột đó — đây là lý do chọn
+  query builder thay vì raw SQL.
+- `openDb` bật `PRAGMA journal_mode=WAL` và `PRAGMA foreign_keys=ON` ngay khi mở.
+
+#### Quản lý migration (drizzle-kit)
+
+**Nguồn sự thật duy nhất là `src/db/schema.ts`.** Không viết `CREATE TABLE` bằng
+tay ở bất kỳ đâu; mọi thay đổi schema bắt đầu từ file này.
+
+Quy trình:
+
+| Bước | Lệnh | Kết quả |
+|---|---|---|
+| Sửa schema | — | Sửa `src/db/schema.ts` |
+| Sinh migration | `npm run db:generate` (`drizzle-kit generate`) | Thêm `drizzle/NNNN_<tên>.sql` + cập nhật `drizzle/meta/_journal.json` |
+| Xem trước | `git diff drizzle/` | **Bắt buộc đọc file SQL sinh ra trước khi commit** |
+| Áp vào DB | `npm run db:migrate` (`drizzle-kit migrate`) | DB lên bản mới nhất |
+| Xem dữ liệu | `npm run db:studio` (`drizzle-kit studio`) | UI xem/sửa dữ liệu khi debug |
+
+- File cấu hình `drizzle.config.ts`: `dialect: 'sqlite'`, `schema: './src/db/schema.ts'`,
+  `out: './drizzle'`, `dbCredentials.url` lấy từ `DB_PATH`.
+- Thư mục `drizzle/` **được commit vào git** — nó là lịch sử schema. Đây là lý do
+  `.gitignore` chỉ chặn `data/` và `*.db`, không chặn `drizzle/`.
+- **Forward-only.** `drizzle-kit` không sinh `down` migration, và `ALTER TABLE`
+  của SQLite quá hạn chế để down migration đáng tin. Rollback thật = restore backup.
+- **Tự backup trước khi áp:** nếu có migration pending và DB là file thật (không
+  phải `:memory:`), copy sang `<DB_PATH>.bak-<timestamp>` trước khi chạy, giữ 3 bản
+  gần nhất. Đây là phần bù cho việc không có down migration.
+- **Không dùng `drizzle-kit push`** ở môi trường thật. `push` đồng bộ schema trực
+  tiếp mà không để lại file migration, làm mất lịch sử và dễ mất dữ liệu.
+- Lúc khởi động app gọi `applyMigrations` (dùng `migrate()` của
+  `drizzle-orm/better-sqlite3/migrator`, đọc thư mục `drizzle/`) và fail fast nếu lỗi.
+  Bảng theo dõi `__drizzle_migrations` do Drizzle tự quản lý.
 
 `TargetsRepo`: `create` · `findByName` · `findAll` · `findDue(now)` ·
 `updateStatus` · `setPause` · `remove`
@@ -132,8 +173,11 @@ tests/
 
 `MetaRepo`: `get(key)` · `set(key, value)`
 
-- **Test:** DB `:memory:` thật — CRUD target; `findDue` trả đúng target tới hạn;
-  chạy migration hai lần không lỗi.
+- **Test:** DB `:memory:` thật, **áp migration từ thư mục `drizzle/`** rồi mới test
+  — không có `schema.sql` riêng cho test, nên schema test luôn khớp production.
+  Kiểm: CRUD target; `findDue` trả đúng target tới hạn; áp migration hai lần thì
+  lần hai không làm gì; `drizzle/` phải khớp `schema.ts` (chạy `db:generate` trong
+  CI, nếu sinh ra file mới nghĩa là ai đó sửa schema mà quên generate → fail build).
 
 ### M3 · monitor (lõi nghiệp vụ)
 
@@ -249,6 +293,11 @@ Validate đầu vào của `/add` (từ chối kèm message rõ ràng, không th
 
 ## 7. Schema SQLite
 
+Phần DDL dưới đây là **đặc tả mong muốn**, không phải file nguồn. Nó được khai báo
+bằng `sqliteTable(...)` trong `src/db/schema.ts`; `drizzle-kit generate` sinh SQL
+thật vào `drizzle/`. Khi hai bên lệch nhau thì `schema.ts` mới là đúng, và spec
+này phải được sửa theo.
+
 ```sql
 CREATE TABLE targets (
   id                    INTEGER PRIMARY KEY,
@@ -303,11 +352,13 @@ Quy ước:
 - `expected_status` chỉ nhận **một** trong hai dạng: một dải `NNN-NNN` (ví dụ
   `200-299`) hoặc một mã đơn `NNN` (ví dụ `204`). Không hỗ trợ danh sách nhiều
   dải. Giá trị sai định dạng bị từ chối ngay ở `/add`.
-- `PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON`.
-- Version schema lưu ở `PRAGMA user_version`.
+- `PRAGMA journal_mode=WAL`, `PRAGMA foreign_keys=ON` — bật trong `openDb`.
+- Lịch sử migration do Drizzle quản lý trong bảng `__drizzle_migrations`; không
+  dùng `PRAGMA user_version`.
 - `status` nhận một trong: `UP`, `DEGRADED`, `DOWN`, `UNKNOWN`.
 
-Định nghĩa `findDue(now)` — điều kiện lọc nằm trong SQL, không nằm ở scheduler:
+Định nghĩa `findDue(now)` — điều kiện lọc nằm trong truy vấn ở repo, không nằm ở
+scheduler. Diễn giải bằng SQL (khi cài thì viết bằng query builder của Drizzle):
 
 ```
 (last_checked_at IS NULL OR datetime(last_checked_at, '+' || interval_seconds || ' seconds') <= now)
@@ -374,7 +425,8 @@ Một tick (mỗi 10s):
 | Loại | Cách test |
 |---|---|
 | Hàm thuần (`evaluate`, `state-machine`, `embeds`, `buildDigest`, `time`) | Unit test bảng input→output, không I/O |
-| Repository | SQLite `:memory:` thật — nhanh, không mock |
+| Repository | SQLite `:memory:` thật + áp migration từ `drizzle/` — nhanh, không mock, schema khớp production |
+| Migration | Áp từ DB rỗng phải ra đúng schema; áp lần hai không làm gì; `db:generate` trong CI không sinh thêm file |
 | `http-probe` | Server `node:http` local trả 200 / 500 / chậm / treo → test timeout, latency, retry |
 | `runner` | Fake probe + fake notifier + DB in-memory; chuỗi UP→DOWN→DOWN→UP bắn đúng 2 alert |
 | `scheduler` | Clock giả, kiểm tra chọn đúng target tới hạn và tôn trọng pause |
@@ -383,9 +435,19 @@ Một tick (mỗi 10s):
 
 ## 12. Phụ thuộc
 
-Runtime: `discord.js`, `zod`, `dotenv`.
-Dev: `typescript`, `tsx`, `vitest`, `@types/node`.
-Không native module, không service ngoài, không thư viện cron.
+Runtime: `discord.js`, `better-sqlite3`, `drizzle-orm`, `zod`, `dotenv`.
+Dev: `drizzle-kit`, `typescript`, `tsx`, `vitest`, `@types/node`, `@types/better-sqlite3`.
+
+Không service ngoài, không thư viện cron.
+
+`better-sqlite3` là **native module**. Đã kiểm chứng trên chính máy dev
+(Windows 11, Node v25.9.0, ABI 141): `better-sqlite3@13.0.3` cài trong 6 giây từ
+prebuild, không cần compile, SQLite 3.53.4, `journal_mode=WAL` hoạt động. Kéo theo
+hai điều phải nhớ:
+
+- Nâng major Node có thể đổi ABI và làm mất prebuild → cần chạy lại `npm rebuild`
+  hoặc chờ prebuild mới. Ghim version Node trong `package.json` `engines`.
+- Ảnh hưởng tới Docker image, xem mục 13.
 
 ## 13. Đường deploy về sau
 
@@ -393,3 +455,14 @@ Chạy local Windows trước (`npm run dev` bằng tsx). Khi cần deploy: Dock
 `docker-compose.yml` bind-mount `./data:/app/data` cho file SQLite. Trên Fly.io
 hoặc Railway phải gắn volume vào `/data` vì filesystem của chúng là ephemeral,
 và phải tắt autostop để process không bị suspend.
+
+Vì `better-sqlite3` là native module, Dockerfile phải lưu ý:
+
+- Dùng base **debian-slim** (`node:<ver>-slim`), không dùng alpine. Alpine là musl
+  nên prebuild glibc không dùng được, phải cài `python3 make g++` để compile.
+- `npm ci` phải chạy **bên trong image**, không copy `node_modules` từ Windows
+  sang — binary native khác nền tảng.
+- Nếu dùng multi-stage build thì stage runtime phải cùng base image với stage
+  build, nếu không binary sẽ không nạp được.
+- Migration chạy bằng `npm run db:migrate` ở bước khởi động container (hoặc để app
+  tự gọi `applyMigrations` lúc boot), sau khi volume đã mount.
