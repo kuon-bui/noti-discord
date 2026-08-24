@@ -61,6 +61,34 @@ describe('downMessage', () => {
   it('giữ nguyên mốc thời gian được truyền vào', () => {
     expect(message.timestampIso).toBe(AT)
   })
+
+  it('che credentials và query URL trong alert', () => {
+    const unsafe = target({
+      url: 'https://user:password@example.test/health?token=top-secret#fragment',
+    })
+    const values = [
+      downMessage(unsafe, { ok: false, error: 'timeout' }, AT),
+      recoveredMessage(unsafe, 1_000, AT),
+      manualCheckMessage(
+        {
+          target: unsafe,
+          result: { ok: true, httpStatus: 200, latencyMs: 1 },
+          status: 'UP',
+          transition: null,
+        },
+        AT,
+      ),
+    ]
+      .flatMap((message) => message.fields)
+      .map((field) => field.value)
+      .join('\n')
+
+    expect(values).toContain('https://example.test/health?…')
+    expect(values).not.toContain('user')
+    expect(values).not.toContain('password')
+    expect(values).not.toContain('token')
+    expect(values).not.toContain('top-secret')
+  })
 })
 
 describe('recoveredMessage', () => {

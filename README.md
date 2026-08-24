@@ -69,6 +69,8 @@ Lệnh admin chỉ nhận user ID có trong `ADMIN_USER_IDS`.
   `DIGEST_CHANNEL_ID`. Nếu process khởi động muộn hơn mốc đó mà hôm nay chưa gửi
   thì nó gửi bù.
 - Endpoint hết hạn pause tự động được check lại, không cần `/resume`.
+- URL lưu nguyên vẹn để probe, nhưng mọi URL hiển thị trên Discord đều che
+  userinfo, query và hash để tránh lộ token/credential.
 
 ## Đổi schema DB
 

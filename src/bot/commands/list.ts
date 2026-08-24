@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js'
 import type { Target } from '../../shared/types.js'
+import { redactUrlForDisplay } from '../../shared/url.js'
 import type { Command } from '../types.js'
 
 const STATUS_ICON: Record<string, string> = {
@@ -11,21 +12,9 @@ const STATUS_ICON: Record<string, string> = {
 
 const MAX_REPLY_CONTENT = 2_000
 const MAX_ROW_CONTENT = 1_800
-const MAX_DISPLAY_URL = 1_000
 
 function isPaused(target: Target, now: Date): boolean {
   return target.pausedUntil !== null && Date.parse(target.pausedUntil) > now.getTime()
-}
-
-function displayUrl(value: string): string {
-  try {
-    const parsed = new URL(value)
-    const redactedSuffix = parsed.search || parsed.hash ? '?…' : ''
-    const displayed = `${parsed.protocol}//${parsed.host}${parsed.pathname}${redactedSuffix}`
-    return truncateText(displayed, MAX_DISPLAY_URL)
-  } catch {
-    return '<URL không hợp lệ>'
-  }
 }
 
 function truncateText(content: string, maxLength: number): string {
@@ -75,7 +64,7 @@ export const listCommand: Command = {
       const icon = STATUS_ICON[target.currentStatus] ?? '⚪'
       const tag = isPaused(target, now) ? ' (paused)' : ''
       return truncateText(
-        `${icon} ${target.name} — ${displayUrl(target.url)} — mỗi ${target.intervalSeconds}s${tag}`,
+        `${icon} ${target.name} — ${redactUrlForDisplay(target.url)} — mỗi ${target.intervalSeconds}s${tag}`,
         MAX_ROW_CONTENT,
       )
     })

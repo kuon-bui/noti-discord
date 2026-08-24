@@ -1,4 +1,5 @@
 import { formatDuration } from '../shared/time.js'
+import { redactUrlForDisplay } from '../shared/url.js'
 import type {
   AlertMessage,
   CheckOutcome,
@@ -27,7 +28,7 @@ export function downMessage(target: Target, result: ProbeResult, atIso: string):
     description: 'Không đạt điều kiện kiểm tra sức khoẻ.',
     color: COLOR_DOWN,
     fields: [
-      { name: 'URL', value: target.url },
+      { name: 'URL', value: redactUrlForDisplay(target.url) },
       { name: 'Lý do', value: reasonOf(result) },
       { name: 'Latency', value: latencyText(result), inline: true },
       { name: 'Ngưỡng status', value: target.expectedStatus, inline: true },
@@ -43,7 +44,7 @@ export function recoveredMessage(target: Target, downtimeMs: number, atIso: stri
     description: 'Kiểm tra sức khoẻ đã trở lại bình thường.',
     color: COLOR_UP,
     fields: [
-      { name: 'URL', value: target.url },
+      { name: 'URL', value: redactUrlForDisplay(target.url) },
       { name: 'Thời gian gián đoạn', value: formatDuration(downtimeMs), inline: true },
     ],
     timestampIso: atIso,
@@ -58,7 +59,7 @@ export function manualCheckMessage(outcome: CheckOutcome, atIso: string): AlertM
     description: `Trạng thái: **${outcome.status}**`,
     color: isDown ? COLOR_DOWN : outcome.status === 'DEGRADED' ? COLOR_WARN : COLOR_UP,
     fields: [
-      { name: 'URL', value: outcome.target.url },
+      { name: 'URL', value: redactUrlForDisplay(outcome.target.url) },
       { name: 'Latency', value: latencyText(outcome.result), inline: true },
       { name: 'Kết quả', value: reasonOf(outcome.result), inline: true },
     ],

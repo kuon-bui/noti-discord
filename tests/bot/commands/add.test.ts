@@ -111,6 +111,19 @@ describe('/add', () => {
     expect(target?.alertChannelId).toBe('chan-9')
   })
 
+  it('che query URL trong xác nhận public nhưng vẫn lưu URL để probe', async () => {
+    const { interaction: value, replies } = interaction({
+      name: 'private-api',
+      url: 'https://example.test/health?token=top-secret',
+    })
+    await addCommand.execute(context, value)
+
+    expect(context.targets.findByName('private-api')?.url).toContain('token=top-secret')
+    expect(replies[0]?.content).toContain('https://example.test/health?…')
+    expect(replies[0]?.content).not.toContain('token')
+    expect(replies[0]?.content).not.toContain('top-secret')
+  })
+
   it('thiếu name hoặc url thì trả lời lỗi, không tạo gì', async () => {
     const { interaction: value, replies } = interaction({ url: 'https://a.test' })
     await addCommand.execute(context, value)

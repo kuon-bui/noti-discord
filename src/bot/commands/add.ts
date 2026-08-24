@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js'
+import { redactUrlForDisplay } from '../../shared/url.js'
 import { EPHEMERAL, type Command } from '../types.js'
 import {
   ValidationError,
@@ -86,7 +87,7 @@ export const addCommand: Command = {
       })
 
       await interaction.reply({
-        content: `Đã thêm \`${name}\` → ${url} (mỗi ${intervalSeconds}s, timeout ${timeoutMs}ms).`,
+        content: `Đã thêm \`${name}\` → ${redactUrlForDisplay(url)} (mỗi ${intervalSeconds}s, timeout ${timeoutMs}ms).`,
       })
     } catch (error) {
       if (error instanceof ValidationError) {
