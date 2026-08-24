@@ -62,4 +62,19 @@ describe('toEmbed', () => {
     const json = toEmbed(message({ fields: many })).toJSON()
     expect(json.fields?.length).toBeLessThanOrEqual(25)
   })
+
+  it('giới hạn tổng ký tự của embed ở 6000', () => {
+    const fields = Array.from({ length: 25 }, (_, index) => ({
+      name: `field-${index}`.repeat(40),
+      value: 'z'.repeat(2_000),
+    }))
+    const json = toEmbed(
+      message({ title: 'x'.repeat(400), description: 'y'.repeat(5_000), fields }),
+    ).toJSON()
+    const total =
+      (json.title?.length ?? 0) +
+      (json.description?.length ?? 0) +
+      (json.fields ?? []).reduce((sum, field) => sum + field.name.length + field.value.length, 0)
+    expect(total).toBeLessThanOrEqual(6_000)
+  })
 })
