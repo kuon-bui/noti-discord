@@ -33,6 +33,10 @@ describe('validateUrl', () => {
   it('message nêu rõ chỉ nhận http và https', () => {
     expect(() => validateUrl('ftp://a.test')).toThrow(/https?/)
   })
+
+  it('từ chối URL chứa credentials', () => {
+    expect(() => validateUrl('https://user:secret@example.test/health')).toThrow(/username|password/)
+  })
 })
 
 describe('validateRange', () => {

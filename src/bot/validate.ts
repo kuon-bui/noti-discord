@@ -23,6 +23,9 @@ export function validateUrl(value: string): string {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new ValidationError('URL chỉ nhận scheme http hoặc https.')
   }
+  if (parsed.username || parsed.password) {
+    throw new ValidationError('URL không được chứa username hoặc password.')
+  }
   return value
 }
 

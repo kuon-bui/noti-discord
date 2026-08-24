@@ -116,4 +116,39 @@ describe('/list', () => {
     await listCommand.execute(context, value)
     expect(replies[0]?.content).toContain('paused')
   })
+
+  it('che credentials và query khi hiển thị URL công khai', async () => {
+    context.targets.create({
+      name: 'secret-endpoint',
+      url: 'https://user:password@example.test/health?token=top-secret#fragment',
+      intervalSeconds: 60,
+      timeoutMs: 10_000,
+      createdBy: 'u1',
+      createdAt: '2026-08-24T00:00:00.000Z',
+    })
+    const { interaction: value, replies } = interaction('list')
+    await listCommand.execute(context, value)
+    const content = replies[0]?.content ?? ''
+    expect(content).toContain('https://example.test/health?…')
+    expect(content).not.toContain('user')
+    expect(content).not.toContain('password')
+    expect(content).not.toContain('token')
+    expect(content).not.toContain('top-secret')
+  })
+
+  it('không vượt giới hạn 2000 ký tự của reply Discord', async () => {
+    for (let index = 0; index < 32; index++) {
+      context.targets.create({
+        name: `target-${index}`,
+        url: `https://example.test/${'x'.repeat(150)}?token=${'y'.repeat(150)}`,
+        intervalSeconds: 60,
+        timeoutMs: 10_000,
+        createdBy: 'u1',
+        createdAt: '2026-08-24T00:00:00.000Z',
+      })
+    }
+    const { interaction: value, replies } = interaction('list')
+    await listCommand.execute(context, value)
+    expect(replies[0]?.content?.length).toBeLessThanOrEqual(2_000)
+  })
 })
