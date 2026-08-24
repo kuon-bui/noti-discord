@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Secrets — .env.example thì vẫn commit
+.env
+.env.local
+.env.*.local
+
+# Dữ liệu SQLite runtime (kèm file WAL/shared-memory)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Log
+*.log
+npm-debug.log*
+
+# Test / coverage
+coverage/
+
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
