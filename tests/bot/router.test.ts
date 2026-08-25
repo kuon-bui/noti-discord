@@ -51,6 +51,14 @@ function setup(commands: Command[]) {
   return { router }
 }
 
+function deferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
+}
+
 describe('router.handle', () => {
   it('route tới command đúng tên', async () => {
     const execute = vi.fn(async () => {})
@@ -97,6 +105,67 @@ describe('router.handle', () => {
 
     await router.handle(interaction)
     expect(execute).toHaveBeenCalledTimes(1)
+  })
+
+  it('chặn cùng user gửi cùng lệnh khi lần trước chưa hoàn tất', async () => {
+    const gate = deferred()
+    const execute = vi.fn(() => gate.promise)
+    const { router } = setup([command('status', false, execute)])
+    const first = fakeInteraction('status', 'user-1')
+    const duplicate = fakeInteraction('status', 'user-1')
+
+    const firstRun = router.handle(first.interaction)
+    await router.handle(duplicate.interaction)
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(duplicate.replies[0]?.content).toMatch(/đang được xử lý/i)
+    expect(duplicate.replies[0]?.flags).toBe(EPHEMERAL)
+
+    gate.resolve()
+    await firstRun
+  })
+
+  it('vẫn cho phép lệnh khác hoặc user khác chạy đồng thời', async () => {
+    const statusGate = deferred()
+    const statusExecute = vi.fn(() => statusGate.promise)
+    const listExecute = vi.fn(async () => {})
+    const { router } = setup([
+      command('status', false, statusExecute),
+      command('list', false, listExecute),
+    ])
+
+    const firstRun = router.handle(fakeInteraction('status', 'user-1').interaction)
+    const otherCommandRun = router.handle(fakeInteraction('list', 'user-1').interaction)
+    const otherUserRun = router.handle(fakeInteraction('status', 'user-2').interaction)
+
+    expect(statusExecute).toHaveBeenCalledTimes(2)
+    expect(listExecute).toHaveBeenCalledTimes(1)
+
+    statusGate.resolve()
+    await Promise.all([firstRun, otherCommandRun, otherUserRun])
+  })
+
+  it('cho phép gửi lại cùng lệnh sau khi lần trước hoàn tất', async () => {
+    const execute = vi.fn(async () => {})
+    const { router } = setup([command('status', false, execute)])
+
+    await router.handle(fakeInteraction('status', 'user-1').interaction)
+    await router.handle(fakeInteraction('status', 'user-1').interaction)
+
+    expect(execute).toHaveBeenCalledTimes(2)
+  })
+
+  it('giải phóng khóa lệnh khi command throw', async () => {
+    const execute = vi
+      .fn<Command['execute']>()
+      .mockRejectedValueOnce(new Error('lệnh nổ'))
+      .mockResolvedValueOnce(undefined)
+    const { router } = setup([command('status', false, execute)])
+
+    await router.handle(fakeInteraction('status', 'user-1').interaction)
+    await router.handle(fakeInteraction('status', 'user-1').interaction)
+
+    expect(execute).toHaveBeenCalledTimes(2)
   })
 
   it('command throw thì trả lời lỗi và KHÔNG throw ra ngoài', async () => {

@@ -16,6 +16,7 @@ export type Router = {
 
 export function makeRouter(deps: RouterDeps): Router {
   const byName = new Map(deps.commands.map((command) => [command.name, command]))
+  const runningCommandsByUser = new Map<string, Set<string>>()
 
   async function replySafe(interaction: InteractionLike, content: string): Promise<void> {
     try {
@@ -40,11 +41,29 @@ export function makeRouter(deps: RouterDeps): Router {
         return
       }
 
+      const runningCommands = runningCommandsByUser.get(interaction.user.id)
+      if (runningCommands?.has(command.name)) {
+        await replySafe(
+          interaction,
+          'Lệnh này của bạn đang được xử lý. Vui lòng đợi hoàn tất trước khi gửi lại.',
+        )
+        return
+      }
+
+      const userCommands = runningCommands ?? new Set<string>()
+      userCommands.add(command.name)
+      runningCommandsByUser.set(interaction.user.id, userCommands)
+
       try {
         await command.execute(deps.ctx, interaction)
       } catch (error) {
         deps.logger.error(`Lệnh /${command.name} thất bại`, error)
         await replySafe(interaction, 'Đã có lỗi khi chạy lệnh này. Xem log của bot để biết chi tiết.')
+      } finally {
+        userCommands.delete(command.name)
+        if (userCommands.size === 0) {
+          runningCommandsByUser.delete(interaction.user.id)
+        }
       }
     },
   }
