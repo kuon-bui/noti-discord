@@ -94,6 +94,34 @@ lại file migration nên làm mất lịch sử schema.
 - Mount volume cho thư mục chứa file SQLite (`./data`), vì filesystem của Fly.io và
   Railway là ephemeral. Trên Fly.io nhớ tắt autostop để process không bị suspend.
 
+`npm install`/`npm ci` tự chạy `postinstall` để build ra `dist/`. Migration DB không
+cần chạy tay — `main()` trong `src/index.ts` tự backup và `applyMigrations` mỗi lần
+process khởi động.
+
+### Wispbyte (hoặc panel Pterodactyl khác)
+
+Không cần Dockerfile — panel chạy app theo egg Node.js có sẵn.
+
+1. Tạo server, chọn egg Node.js. Kiểm tra version egg hỗ trợ có `>=25` không
+   (`engines.node` trong `package.json`); nếu panel chưa có Node 25, hạ tạm
+   `engines.node` xuống bản panel hỗ trợ rồi chạy lại `npm test`/`typecheck` để
+   xác nhận không có gì vỡ trước khi đổi.
+2. Đưa code lên bằng file manager/SFTP hoặc git pull qua console — **không copy
+   `node_modules` từ Windows**, để panel tự `npm install`/`npm ci` build lại
+   `better-sqlite3` đúng glibc của container.
+3. Điền toàn bộ biến trong `.env.example` vào tab **Startup/Variables** của panel.
+4. Đảm bảo thư mục `data/` (giá trị `DB_PATH`) nằm trong phần lưu trữ persistent
+   của server, không bị xoá giữa các lần restart.
+5. Startup command: `node dist/index.js` (đã có `dist/` nhờ `postinstall`).
+6. Chạy `npm run deploy-commands` một lần qua console panel sau khi đã điền
+   `DISCORD_TOKEN`/`DISCORD_CLIENT_ID` để đăng ký slash command — bước này không
+   tự động, vì đăng ký lại mỗi lần deploy có thể dư thừa/hit rate limit.
+
+Lưu ý: `postinstall` gọi `npm run build` (`tsc`), cần `typescript` trong
+`devDependencies` đã được cài. Nếu egg cấu hình install command với
+`--omit=dev`/`NODE_ENV=production`, `postinstall` sẽ fail vì thiếu `tsc` — khi đó
+bỏ cờ đó đi hoặc build tay bằng `npm run build` sau khi cài xong.
+
 ## Vận hành an toàn
 
 `ADMIN_USER_IDS` là danh sách người tin cậy có thể thêm endpoint. Monitor có thể

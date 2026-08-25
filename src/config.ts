@@ -11,7 +11,7 @@ const schema = z.object({
 
   DB_PATH: z.string().min(1).default('./data/monitor.db'),
   DIGEST_HOUR_LOCAL: z.coerce.number().int().min(0).max(23).default(9),
-  DEFAULT_INTERVAL_SECONDS: z.coerce.number().int().min(10).max(86_400).default(60),
+  DEFAULT_INTERVAL_SECONDS: z.coerce.number().int().min(1).max(86_400).default(60),
   DEFAULT_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(10_000),
   DEFAULT_LATENCY_THRESHOLD_MS: z.coerce.number().int().positive().default(2_000),
   CHECK_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
