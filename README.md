@@ -79,9 +79,10 @@ Lệnh admin chỉ nhận user ID có trong `ADMIN_USER_IDS`.
 3. **Đọc file SQL sinh ra trong `drizzle/`** rồi commit nó cùng thay đổi schema.
 4. `npm run db:migrate`.
 
-Migration là forward-only, không có `down`. App tự backup file DB trước khi áp
-migration mới và giữ 3 bản gần nhất. Không dùng `drizzle-kit push` — nó không để
-lại file migration nên làm mất lịch sử schema.
+Migration là forward-only, không có `down`. App chỉ backup file DB khi phát hiện
+có migration mới chưa áp và giữ 1 bản gần nhất để không làm đầy quota lưu trữ.
+Không dùng `drizzle-kit push` — nó không để lại file migration nên làm mất lịch sử
+schema.
 
 ## Deploy
 
@@ -95,8 +96,9 @@ lại file migration nên làm mất lịch sử schema.
   Railway là ephemeral. Trên Fly.io nhớ tắt autostop để process không bị suspend.
 
 `npm install`/`npm ci` tự chạy `postinstall` để build ra `dist/`. Migration DB không
-cần chạy tay — `main()` trong `src/index.ts` tự backup và `applyMigrations` mỗi lần
-process khởi động.
+cần chạy tay — `main()` trong `src/index.ts` tự backup khi cần và chạy
+`applyMigrations` mỗi lần process khởi động. Lịch sử check hết hạn cũng được dọn
+ngay khi khởi động và trước mỗi digest, kể cả khi gửi Discord thất bại.
 
 ### Wispbyte (hoặc panel Pterodactyl khác)
 

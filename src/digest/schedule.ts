@@ -59,10 +59,6 @@ export function makeDigestJob(deps: DigestJobDeps): DigestJob {
       }))
 
       const report = buildDigest(inputs, '24 giờ qua', sinceIso, nowIso)
-      await deps.notifier.send(digestMessage(report, nowIso), deps.config.digestChannelId)
-
-      deps.meta.set(LAST_DIGEST_KEY, today)
-
       const cutoffIso = new Date(
         now.getTime() - deps.config.checkRetentionDays * DAY_MS,
       ).toISOString()
@@ -70,6 +66,10 @@ export function makeDigestJob(deps: DigestJobDeps): DigestJob {
       if (removed > 0) {
         deps.logger.info(`Đã dọn ${removed} dòng checks cũ hơn ${cutoffIso}`)
       }
+
+      await deps.notifier.send(digestMessage(report, nowIso), deps.config.digestChannelId)
+
+      deps.meta.set(LAST_DIGEST_KEY, today)
 
       return { sent: true }
     },
