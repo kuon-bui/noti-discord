@@ -9,14 +9,11 @@
     "verbatimModuleSyntax": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "rootDir": "src",
-    "outDir": "dist",
+    "noEmit": true,
     "paths": {
       "@/*": ["./src/*"]
     },
-    "sourceMap": true,
-    "declaration": false,
-    "types": ["node"]
+    "types": ["bun"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts"]
 }

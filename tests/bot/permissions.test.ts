@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { isAdmin } from '../../src/bot/permissions.js'
 
 const config = { adminUserIds: ['111', '222'] as readonly string[] }

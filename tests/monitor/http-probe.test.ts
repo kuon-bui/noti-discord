@@ -1,6 +1,6 @@
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import { makeHttpProbe } from '../../src/monitor/http-probe.js'
 import type { Target } from '../../src/shared/types.js'
 

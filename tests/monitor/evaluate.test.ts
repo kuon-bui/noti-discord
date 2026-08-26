@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { evaluate, parseExpectedStatus } from '../../src/monitor/evaluate.js'
 import type { ProbeResult, Target } from '../../src/shared/types.js'
 

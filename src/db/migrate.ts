@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type Database from 'better-sqlite3'
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
+import type Database from 'bun:sqlite'
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { readMigrationFiles } from 'drizzle-orm/migrator'
 import type { Db } from './connection.js'
 
@@ -12,7 +12,7 @@ export async function applyMigrations(db: Db, folder: string = MIGRATIONS_FOLDER
 }
 
 export function hasPendingMigrations(
-  raw: Database.Database,
+  raw: Database,
   folder: string = MIGRATIONS_FOLDER,
 ): boolean {
   const latestAvailable = readMigrationFiles({ migrationsFolder: folder }).at(-1)?.folderMillis
@@ -21,8 +21,10 @@ export function hasPendingMigrations(
   try {
     const row = raw
       .prepare('SELECT created_at FROM __drizzle_migrations ORDER BY created_at DESC LIMIT 1')
-      .get() as { created_at: number } | undefined
-    return row === undefined || Number(row.created_at) < latestAvailable
+      .get() as { created_at: number } | null | undefined
+    // bun:sqlite trả về null cho tập rỗng (khác better-sqlite3 trả undefined) —
+    // dùng == để khớp cả hai, đây là chỗ duy nhất cố ý dùng loose equality.
+    return row == null || Number(row.created_at) < latestAvailable
   } catch (error) {
     if (error instanceof Error && /no such table/i.test(error.message)) return true
     throw error

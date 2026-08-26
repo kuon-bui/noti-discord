@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'bun:test'
 import { openTestDb } from '../../src/db/connection.js'
 import {
   applyMigrations,
@@ -9,7 +9,7 @@ import {
   hasPendingMigrations,
 } from '../../src/db/migrate.js'
 
-function tableNames(raw: import('better-sqlite3').Database): string[] {
+function tableNames(raw: import('bun:sqlite').Database): string[] {
   return raw
     .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`)
     .all()
@@ -66,6 +66,17 @@ describe('applyMigrations', () => {
     )
     insert.run('web', 'https://a.test')
     expect(() => insert.run('web', 'https://b.test')).toThrow(/UNIQUE/i)
+    raw.close()
+  })
+
+  it('phát hiện migration đang chờ khi bảng __drizzle_migrations tồn tại nhưng rỗng', () => {
+    const { raw } = openTestDb()
+    raw.exec(`CREATE TABLE __drizzle_migrations (
+      id INTEGER PRIMARY KEY,
+      hash TEXT NOT NULL,
+      created_at numeric
+    )`)
+    expect(hasPendingMigrations(raw)).toBe(true)
     raw.close()
   })
 

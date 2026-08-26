@@ -1,3 +1,4 @@
+import type { Changes } from 'bun:sqlite'
 import { and, asc, eq, isNull, or, sql } from 'drizzle-orm'
 import type { Status, Target } from '../shared/types.js'
 import type { Db } from './connection.js'
@@ -116,7 +117,7 @@ export function makeTargetsRepo(db: Db): TargetsRepo {
     },
 
     remove(name) {
-      const result = db.delete(targets).where(eq(targets.name, name)).run()
+      const result = db.delete(targets).where(eq(targets.name, name)).run() as unknown as Changes
       return result.changes > 0
     },
   }
