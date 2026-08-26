@@ -11,6 +11,9 @@
     "skipLibCheck": true,
     "rootDir": "src",
     "outDir": "dist",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "sourceMap": true,
     "declaration": false,
     "types": ["node"]
