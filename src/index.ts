@@ -11,7 +11,12 @@ import { makeChecksRepo } from './db/checks.repo.js'
 import { openDb } from './db/connection.js'
 import { makeIncidentsRepo } from './db/incidents.repo.js'
 import { makeMetaRepo } from './db/meta.repo.js'
-import { applyMigrations, backupDbFile } from './db/migrate.js'
+import {
+  applyMigrations,
+  backupDbFile,
+  hasPendingMigrations,
+  pruneBackups,
+} from './db/migrate.js'
 import { makeTargetsRepo } from './db/targets.repo.js'
 import { makeDigestJob } from './digest/schedule.js'
 import { makeHttpProbe } from './monitor/http-probe.js'
@@ -25,13 +30,18 @@ async function main(): Promise<void> {
   const logger = makeLogger(config.logLevel)
   const clock = () => new Date()
 
+  const dbExisted = config.dbPath !== ':memory:' && fs.existsSync(config.dbPath)
   if (config.dbPath !== ':memory:') {
     fs.mkdirSync(path.dirname(path.resolve(config.dbPath)), { recursive: true })
-    const backup = backupDbFile(config.dbPath, clock())
-    if (backup) logger.info(`Đã backup DB sang ${backup}`)
+    pruneBackups(config.dbPath)
   }
 
   const { raw, db } = openDb(config.dbPath)
+  if (dbExisted && hasPendingMigrations(raw)) {
+    raw.pragma('wal_checkpoint(TRUNCATE)')
+    const backup = backupDbFile(config.dbPath, clock())
+    if (backup) logger.info(`Đã backup DB trước migration sang ${backup}`)
+  }
   await applyMigrations(db)
   logger.info(`DB đã sẵn sàng tại ${config.dbPath}`)
 
@@ -39,6 +49,12 @@ async function main(): Promise<void> {
   const checks = makeChecksRepo(db)
   const incidents = makeIncidentsRepo(db)
   const meta = makeMetaRepo(db)
+
+  const cutoffIso = new Date(
+    clock().getTime() - config.checkRetentionDays * 24 * 60 * 60 * 1_000,
+  ).toISOString()
+  const removed = checks.deleteOlderThan(cutoffIso)
+  if (removed > 0) logger.info(`Đã dọn ${removed} dòng checks cũ hơn ${cutoffIso}`)
 
   const client = createClient()
   const notifier = makeDiscordNotifier({ client, logger })

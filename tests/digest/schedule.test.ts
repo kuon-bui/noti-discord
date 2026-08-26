@@ -107,6 +107,19 @@ describe('digestJob.maybeSend', () => {
     expect(context.meta.get(LAST_DIGEST_KEY)).toBeNull()
   })
 
+  it('gửi thất bại vẫn dọn checks hết hạn', async () => {
+    const context = await setup(AT_9AM_VN, { failNotify: true })
+    const target = seed(context.targets, 'web')
+    context.checks.insert({
+      targetId: target.id,
+      checkedAt: '2026-06-01T00:00:00.000Z',
+      status: 'UP',
+    })
+
+    await expect(context.job.maybeSend()).rejects.toThrow('Discord sập')
+    expect(context.checks.listRecent(target.id, 10)).toHaveLength(0)
+  })
+
   it('không có target nào thì vẫn gửi báo cáo rỗng', async () => {
     const context = await setup(AT_9AM_VN)
     expect((await context.job.maybeSend()).sent).toBe(true)

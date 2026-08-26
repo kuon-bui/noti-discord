@@ -3,7 +3,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { openTestDb } from '../../src/db/connection.js'
-import { applyMigrations, backupDbFile } from '../../src/db/migrate.js'
+import {
+  applyMigrations,
+  backupDbFile,
+  hasPendingMigrations,
+} from '../../src/db/migrate.js'
 
 function tableNames(raw: import('better-sqlite3').Database): string[] {
   return raw
@@ -13,6 +17,14 @@ function tableNames(raw: import('better-sqlite3').Database): string[] {
 }
 
 describe('applyMigrations', () => {
+  it('phát hiện migration đang chờ trước khi áp và hết chờ sau khi áp', async () => {
+    const { raw, db } = openTestDb()
+    expect(hasPendingMigrations(raw)).toBe(true)
+    await applyMigrations(db)
+    expect(hasPendingMigrations(raw)).toBe(false)
+    raw.close()
+  })
+
   it('tạo đủ 4 bảng nghiệp vụ từ DB rỗng', async () => {
     const { raw, db } = openTestDb()
     await applyMigrations(db)
@@ -107,7 +119,7 @@ describe('backupDbFile', () => {
     expect(fs.readFileSync(dest as string, 'utf8')).toBe('giả lập nội dung db')
   })
 
-  it('chỉ giữ 3 bản backup gần nhất', () => {
+  it('mặc định chỉ giữ bản backup gần nhất', () => {
     const file = tmpDbFile()
     for (const iso of [
       '2026-08-20T00:00:00.000Z',
@@ -122,8 +134,7 @@ describe('backupDbFile', () => {
       .readdirSync(path.dirname(file))
       .filter((f) => f.startsWith('monitor.db.bak-'))
       .sort()
-    expect(backups).toHaveLength(3)
-    expect(backups[0]).toContain('2026-08-22')
-    expect(backups[2]).toContain('2026-08-24')
+    expect(backups).toHaveLength(1)
+    expect(backups[0]).toContain('2026-08-24')
   })
 })
