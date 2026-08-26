@@ -75,9 +75,20 @@ cùng: `@types/bun`, `@types/node`, `drizzle-kit`, `typescript`. `dependencies` 
 
 `engines` đổi từ `{ "node": ">=25.0.0" }` thành `{ "bun": ">=1.3.0" }`.
 
-`tsconfig.json`: `module`/`moduleResolution` sang `preserve`/`bundler`, thêm
-`noEmit: true`, bỏ `rootDir` và `outDir`, `types` đổi từ `["node"]` sang `["bun"]`,
-`include` mở rộng cho `tests/` và `scripts/`.
+`tsconfig.json`: thêm `noEmit: true`, bỏ `rootDir`, `outDir`, `sourceMap`, `declaration`,
+`types` đổi từ `["node"]` sang `["bun"]`, `include` mở rộng cho `scripts/`.
+
+Giữ nguyên `module`/`moduleResolution` là `nodenext`. Bản thảo đầu định đổi sang
+`preserve`/`bundler`, nhưng mã nguồn đang import kèm đuôi `.js` (`from './schema.js'`) và
+`nodenext` xử lý đúng kiểu đó sẵn; đổi sang `bundler` là thay đổi không cần thiết trên một
+diff vốn đã rộng.
+
+`include` **không** mở rộng sang `tests/`. Bản thảo đầu định làm vậy, nhưng đo thực tế cho
+thấy tests chưa bao giờ được typecheck và đang có 4 lỗi type tồn sẵn ở
+`tests/bot/router.test.ts` (2 lỗi, phương sai của `Mock<>`) và
+`tests/notify/discord-notifier.test.ts:41` (2 lỗi, `noUncheckedIndexedAccess` trên tuple
+rỗng). Bật typecheck cho tests là cải thiện thật nhưng là một thay đổi riêng với fallout
+riêng, không thuộc việc đổi runtime. Xem mục "Ngoài phạm vi".
 
 ### 2. Tầng DB
 
@@ -99,10 +110,12 @@ cùng: `@types/bun`, `@types/node`, `drizzle-kit`, `typescript`. `dependencies` 
 `src/index.ts`: `raw.pragma('wal_checkpoint(TRUNCATE)')` thành
 `raw.exec('PRAGMA wal_checkpoint(TRUNCATE)')`. `raw.close()` giữ nguyên.
 
-Rủi ro cần canh: `hasPendingMigrations` truy vấn thẳng bảng `__drizzle_migrations`.
-Hai adapter dùng chung `drizzle-orm/migrator` nên nhiều khả năng schema bảng giống nhau,
-nhưng `tests/db/migrate.test.ts` là chỗ bắt được nếu không. Nếu cột `created_at` khác đi
-thì phải sửa truy vấn cho khớp thực tế của adapter mới.
+`hasPendingMigrations` **không cần sửa**. Đã chạy probe thật với adapter `bun-sqlite` trên
+đúng thư mục `drizzle/` của repo: migrator tạo bảng `__drizzle_migrations` với cột
+`id` / `hash` / `created_at`, trong đó `created_at` là epoch mili-giây
+(`{ created_at: 1787560724017 }`) — đúng thứ truy vấn hiện tại đang đọc và đúng đơn vị mà
+`folderMillis` so sánh. Bốn bảng nghiệp vụ cũng được tạo đủ. `new Database(path)` của
+`bun:sqlite` tự tạo file, không cần tuỳ chọn thêm.
 
 ### 3. Script quanh drizzle-kit
 
@@ -174,6 +187,8 @@ là dependency nặng nhất của dự án.
 ## Ngoài phạm vi
 
 - Không đổi logic nghiệp vụ, không đổi schema DB, không đổi hành vi bot
+- Không bật typecheck cho `tests/`. Đang có 4 lỗi type tồn sẵn ở đó (xem mục 1); dọn
+  chúng và thêm `tests/**/*.ts` vào `include` là việc riêng, làm sau khi migrate xong
 - Không thêm CI (repo hiện chưa có `.github/workflows`)
 - Không viết Dockerfile (panel chạy trực tiếp, không đóng image)
 - Không dùng `bun build --compile` đóng binary — chạy thẳng mã nguồn đơn giản hơn và
