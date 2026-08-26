@@ -130,10 +130,20 @@ try/catch ở runner vẫn là chốt cuối.
 Digest là trường hợp riêng: nó không thuộc target nào, hiện gửi thẳng vào
 `config.digestChannelId`. Nó dùng một quy tắc riêng `digestDestinations()`:
 
-- Luôn có `('discord', DIGEST_CHANNEL_ID)` — giữ đúng hành vi hiện tại.
-- Cộng thêm mọi destination global (`target_id IS NULL`) của các provider **khác**
-  Discord. Nghĩa là Messenger nhận digest nếu đã có PSID nào link, còn `DIGEST_CHANNEL_ID`
-  không bị destination Discord global ghi đè.
+- Luôn có `('discord', DIGEST_CHANNEL_ID)` — giữ đúng hành vi hiện tại, và không bị
+  destination Discord global ghi đè.
+- Cộng thêm `('messenger', psid)` cho **mọi `messenger_identities` có `is_admin = 1`**.
+
+Lưu ý định tuyến digest của Messenger là **identity-driven, không destination-driven** —
+đây là cố ý, không phải lệch khỏi mô hình. Digest là báo cáo vận hành, nên vị ngữ đúng
+để lọc là "có quyền admin", không phải "đã đăng ký nhận alert". Hai thứ đó trùng nhau
+hôm nay nhưng không phải một.
+
+Điều kiện `is_admin = 1` phải viết tường minh dù hôm nay nó luôn đúng: `/messenger-link`
+là lệnh admin-only nên link code luôn mang Discord id của một admin, khiến mọi PSID đã
+link đều là admin. Nếu dựa vào tính chất tình cờ đó thay vì lọc thật, thì ngày nào thêm
+đường link cho người không phải admin (kiểu subscriber chỉ đọc), digest — vốn là bản
+kiểm kê toàn bộ endpoint — sẽ âm thầm lọt sang họ.
 
 ### 2. Tầng render: `AlertMessage` nhận `table`
 
@@ -446,6 +456,7 @@ Mục 6–14 là lát cắt Messenger, dựng sau và bật bằng `MESSENGER_EN
 | `messenger/interaction.test.ts` | Chạy thật `statusCommand` và `addCommand` qua adapter — bằng chứng tái dùng được, không chỉ là tuyên bố |
 | `messenger/link.test.ts` | Code hết hạn, code đã dùng, link thành công cấp đúng quyền |
 | `db/destinations.repo.test.ts` | Fallback **theo từng provider**, chống trùng row global |
+| `digest/schedule.test.ts` | Bổ sung: digest tới `DIGEST_CHANNEL_ID` cộng mọi PSID `is_admin = 1`; PSID đã link nhưng `is_admin = 0` **không** nhận digest dù vẫn nhận alert |
 | `db/outbox.repo.test.ts` | Enqueue, flush, gộp khi > 3, bỏ khi quá hạn |
 | `db/migrate.test.ts` | Bổ sung: backfill `alert_channel_id` đúng |
 
