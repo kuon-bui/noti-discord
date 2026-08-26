@@ -38,8 +38,10 @@ bun run dev
 | `bun test` | Chạy toàn bộ test |
 | `bun run typecheck` | Kiểm tra kiểu, không xuất file |
 | `bun run db:generate` | Sinh migration sau khi sửa `schema.ts` |
+| `bun run db:data <tên>` | Sinh migration rỗng để tự viết SQL đổi dữ liệu |
 | `bun run db:migrate` | Áp migration vào DB |
 | `bun run db:drift` | Chặn `schema.ts` lệch với `drizzle/` |
+| `bun run db:studio` | Mở Drizzle Studio để xem/sửa dữ liệu |
 | `bun run deploy-commands` | Đăng ký slash command vào guild |
 
 ## Slash command
@@ -83,14 +85,33 @@ có migration mới chưa áp và giữ 1 bản gần nhất để không làm �
 Không dùng `drizzle-kit push` — nó không để lại file migration nên làm mất lịch sử
 schema.
 
-Không còn script `db:studio`: `drizzle-kit` chỉ kết nối SQLite qua `better-sqlite3`
-hoặc `@libsql/client`, nó không hỗ trợ `bun:sqlite`, và giữ một native module chỉ để
-xem dữ liệu thì không đáng. Khi cần nhìn vào DB, hoặc mở thẳng file `.db` bằng một
-SQLite browser bất kỳ, hoặc cài tạm rồi gỡ đi.
+## Migrate dữ liệu
 
-```bash
-bun add -D better-sqlite3 && bunx drizzle-kit studio
-```
+`drizzle-kit` chỉ sinh được DDL từ `schema.ts`. Khi cần đổi chính dữ liệu (backfill
+cột mới, chuẩn hoá giá trị, sửa hàng đã lỗi), tạo một migration rỗng rồi tự viết SQL:
+
+1. `bun run db:data ten_viec` — sinh file `drizzle/NNNN_ten_viec.sql` rỗng.
+2. Viết DML vào đó (`UPDATE`/`INSERT`/`DELETE`), nhiều câu thì phân tách bằng
+   `--> statement-breakpoint`.
+3. `bun run db:migrate`.
+
+Migration dữ liệu đi cùng đường ray với migration schema: cùng thứ tự, cùng bảng ghi
+nhận `__drizzle_migrations`, nên mỗi file chỉ chạy đúng một lần và tự chạy khi process
+khởi động. Nó cũng không làm `db:drift` đỏ, vì snapshot schema không đổi.
+
+## Xem dữ liệu
+
+`bun run db:studio` mở Drizzle Studio trên đúng file DB trong `DB_PATH`.
+
+Lưu ý duy nhất: **đừng ép drizzle-kit chạy bằng Bun.** Mọi lệnh drizzle-kit cần mở file
+SQLite (`studio`, `migrate`, `push`, `introspect`) đều đi qua `better-sqlite3` — native
+module dùng NAPI — và `bunx --bun drizzle-kit ...` làm Bun panic. Không truyền `--bun`
+thì `bunx` giao cho Node theo shebang và mọi thứ chạy bình thường.
+
+Không phải cài thêm gì: `better-sqlite3` đã là `optionalDependencies` của `drizzle-orm`,
+kèm prebuilt cho linux/linuxmusl/darwin/win32 (cả x64 và arm64), nên vẫn không có bước
+biên dịch native nào. Nó chỉ được dùng bởi tool drizzle-kit lúc phát triển; app chạy
+bằng `bun:sqlite` như trước.
 
 ## Deploy
 
