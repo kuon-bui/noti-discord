@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { transitionFor } from '../../src/monitor/state-machine.js'
 import type { Status, Transition } from '../../src/shared/types.js'
 

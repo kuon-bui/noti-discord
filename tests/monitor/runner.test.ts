@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'bun:test'
 import { openTestDb } from '../../src/db/connection.js'
 import { makeChecksRepo } from '../../src/db/checks.repo.js'
 import { makeIncidentsRepo } from '../../src/db/incidents.repo.js'

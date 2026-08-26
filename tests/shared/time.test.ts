@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { formatDuration, vnDateString, vnHour } from '../../src/shared/time.js'
 
 describe('vnDateString', () => {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'bun:test'
 import { listCommand } from '../../../src/bot/commands/list.js'
 import { removeCommand } from '../../../src/bot/commands/remove.js'
 import type { CommandContext, InteractionLike, InteractionReply } from '../../../src/bot/types.js'

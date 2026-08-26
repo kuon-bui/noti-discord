@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, mock } from 'bun:test'
 import { makeRouter } from '../../src/bot/router.js'
 import {
   EPHEMERAL,
@@ -36,7 +36,7 @@ function fakeInteraction(commandName: string, userId: string) {
   return { interaction, replies }
 }
 
-function command(name: string, adminOnly: boolean, execute = vi.fn(async () => {})): Command {
+function command(name: string, adminOnly: boolean, execute = mock(async () => {})): Command {
   return { name, adminOnly, data: { name, toJSON: () => ({}) }, execute }
 }
 
@@ -61,7 +61,7 @@ function deferred() {
 
 describe('router.handle', () => {
   it('route tới command đúng tên', async () => {
-    const execute = vi.fn(async () => {})
+    const execute = mock(async () => {})
     const { router } = setup([command('status', false, execute), command('list', false)])
     const { interaction } = fakeInteraction('status', 'user-1')
 
@@ -79,7 +79,7 @@ describe('router.handle', () => {
   })
 
   it('chặn user thường dùng lệnh adminOnly', async () => {
-    const execute = vi.fn(async () => {})
+    const execute = mock(async () => {})
     const { router } = setup([command('add', true, execute)])
     const { interaction, replies } = fakeInteraction('add', 'user-thuong')
 
@@ -90,7 +90,7 @@ describe('router.handle', () => {
   })
 
   it('cho admin dùng lệnh adminOnly', async () => {
-    const execute = vi.fn(async () => {})
+    const execute = mock(async () => {})
     const { router } = setup([command('add', true, execute)])
     const { interaction } = fakeInteraction('add', 'admin-1')
 
@@ -99,7 +99,7 @@ describe('router.handle', () => {
   })
 
   it('cho mọi người dùng lệnh không adminOnly', async () => {
-    const execute = vi.fn(async () => {})
+    const execute = mock(async () => {})
     const { router } = setup([command('list', false, execute)])
     const { interaction } = fakeInteraction('list', 'user-thuong')
 
@@ -109,7 +109,7 @@ describe('router.handle', () => {
 
   it('chặn cùng user gửi cùng lệnh khi lần trước chưa hoàn tất', async () => {
     const gate = deferred()
-    const execute = vi.fn(() => gate.promise)
+    const execute = mock(() => gate.promise)
     const { router } = setup([command('status', false, execute)])
     const first = fakeInteraction('status', 'user-1')
     const duplicate = fakeInteraction('status', 'user-1')
@@ -127,8 +127,8 @@ describe('router.handle', () => {
 
   it('vẫn cho phép lệnh khác hoặc user khác chạy đồng thời', async () => {
     const statusGate = deferred()
-    const statusExecute = vi.fn(() => statusGate.promise)
-    const listExecute = vi.fn(async () => {})
+    const statusExecute = mock(() => statusGate.promise)
+    const listExecute = mock(async () => {})
     const { router } = setup([
       command('status', false, statusExecute),
       command('list', false, listExecute),
@@ -146,7 +146,7 @@ describe('router.handle', () => {
   })
 
   it('cho phép gửi lại cùng lệnh sau khi lần trước hoàn tất', async () => {
-    const execute = vi.fn(async () => {})
+    const execute = mock(async () => {})
     const { router } = setup([command('status', false, execute)])
 
     await router.handle(fakeInteraction('status', 'user-1').interaction)
@@ -156,8 +156,7 @@ describe('router.handle', () => {
   })
 
   it('giải phóng khóa lệnh khi command throw', async () => {
-    const execute = vi
-      .fn<Command['execute']>()
+    const execute = mock<Command['execute']>()
       .mockRejectedValueOnce(new Error('lệnh nổ'))
       .mockResolvedValueOnce(undefined)
     const { router } = setup([command('status', false, execute)])
@@ -169,7 +168,7 @@ describe('router.handle', () => {
   })
 
   it('command throw thì trả lời lỗi và KHÔNG throw ra ngoài', async () => {
-    const execute = vi.fn(async () => {
+    const execute = mock(async () => {
       throw new Error('lệnh nổ')
     })
     const { router } = setup([command('status', false, execute)])
@@ -180,7 +179,7 @@ describe('router.handle', () => {
   })
 
   it('command throw sau khi đã reply thì không làm sập router', async () => {
-    const execute = vi.fn(async (_context: CommandContext, interaction: InteractionLike) => {
+    const execute = mock(async (_context: CommandContext, interaction: InteractionLike) => {
       await interaction.reply({ content: 'xong một phần' })
       throw new Error('nổ sau khi reply')
     })

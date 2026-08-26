@@ -4,13 +4,11 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
-*.tsbuildinfo
-
 # Secrets — .env.example thì vẫn commit
 .env
 .env.local
+.env.production
+.env.development
 .env.*.local
 
 # Dữ liệu SQLite runtime (kèm file WAL/shared-memory)
