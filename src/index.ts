@@ -1,5 +1,4 @@
 import fs from 'node:fs'
-import path from 'node:path'
 import { Events } from 'discord.js'
 import { createClient } from './bot/client.js'
 import { allCommands } from './bot/commands/index.js'
@@ -31,7 +30,6 @@ async function main(): Promise<void> {
 
   const dbExisted = config.dbPath !== ':memory:' && fs.existsSync(config.dbPath)
   if (config.dbPath !== ':memory:') {
-    fs.mkdirSync(path.dirname(path.resolve(config.dbPath)), { recursive: true })
     pruneBackups(config.dbPath)
   }
 

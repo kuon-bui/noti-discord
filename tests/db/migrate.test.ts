@@ -69,6 +69,17 @@ describe('applyMigrations', () => {
     raw.close()
   })
 
+  it('phát hiện migration đang chờ khi bảng __drizzle_migrations tồn tại nhưng rỗng', () => {
+    const { raw } = openTestDb()
+    raw.exec(`CREATE TABLE __drizzle_migrations (
+      id INTEGER PRIMARY KEY,
+      hash TEXT NOT NULL,
+      created_at numeric
+    )`)
+    expect(hasPendingMigrations(raw)).toBe(true)
+    raw.close()
+  })
+
   it('ON DELETE CASCADE xoá checks khi xoá target', async () => {
     const { raw, db } = openTestDb()
     await applyMigrations(db)

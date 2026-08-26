@@ -94,7 +94,7 @@ bun add -D better-sqlite3 && bunx drizzle-kit studio
 
 ## Deploy
 
-Không còn native module nào, nên không còn ràng buộc về base image, glibc/musl hay
+Không còn module cần biên dịch native nào, nên không còn ràng buộc về base image, glibc/musl hay
 rebuild khi đổi máy. Điều duy nhất còn quan trọng: **mount volume cho thư mục chứa file
 SQLite** (`./data`), vì filesystem của Fly.io và Railway là ephemeral. Trên Fly.io nhớ
 tắt autostop để process không bị suspend.

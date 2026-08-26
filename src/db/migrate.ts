@@ -21,8 +21,10 @@ export function hasPendingMigrations(
   try {
     const row = raw
       .prepare('SELECT created_at FROM __drizzle_migrations ORDER BY created_at DESC LIMIT 1')
-      .get() as { created_at: number } | undefined
-    return row === undefined || Number(row.created_at) < latestAvailable
+      .get() as { created_at: number } | null | undefined
+    // bun:sqlite trả về null cho tập rỗng (khác better-sqlite3 trả undefined) —
+    // dùng == để khớp cả hai, đây là chỗ duy nhất cố ý dùng loose equality.
+    return row == null || Number(row.created_at) < latestAvailable
   } catch (error) {
     if (error instanceof Error && /no such table/i.test(error.message)) return true
     throw error
