@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import { REST, Routes } from 'discord.js'
 import { loadConfig } from '../config.js'
 import { makeLogger } from '../shared/logger.js'

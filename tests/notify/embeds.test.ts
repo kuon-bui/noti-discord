@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'bun:test'
 import { toEmbed } from '../../src/notify/embeds.js'
 import type { AlertMessage } from '../../src/shared/types.js'
 

@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import type Database from 'better-sqlite3'
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
+import type Database from 'bun:sqlite'
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { readMigrationFiles } from 'drizzle-orm/migrator'
 import type { Db } from './connection.js'
 
@@ -12,7 +12,7 @@ export async function applyMigrations(db: Db, folder: string = MIGRATIONS_FOLDER
 }
 
 export function hasPendingMigrations(
-  raw: Database.Database,
+  raw: Database,
   folder: string = MIGRATIONS_FOLDER,
 ): boolean {
   const latestAvailable = readMigrationFiles({ migrationsFolder: folder }).at(-1)?.folderMillis

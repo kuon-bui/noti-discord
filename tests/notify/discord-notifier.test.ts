@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, mock } from 'bun:test'
 import {
   makeDiscordNotifier,
   type ChannelFetcher,
@@ -28,7 +28,7 @@ function fakeClient(channel: unknown, options: { throwOnFetch?: boolean } = {}):
 
 describe('makeDiscordNotifier', () => {
   it('gửi embed vào đúng channel', async () => {
-    const send = vi.fn(async () => ({}))
+    const send = mock(async () => ({}))
     const notifier = makeDiscordNotifier({
       client: fakeClient({ isTextBased: () => true, send }),
       logger: silentLogger,
@@ -62,7 +62,7 @@ describe('makeDiscordNotifier', () => {
 
   it('lỗi lần đầu thì thử lại đúng một lần rồi thành công', async () => {
     let calls = 0
-    const send = vi.fn(async () => {
+    const send = mock(async () => {
       calls++
       if (calls === 1) throw new Error('503 từ Discord')
       return {}
@@ -79,7 +79,7 @@ describe('makeDiscordNotifier', () => {
 
   it('thất bại cả hai lần thì throw lỗi lần cuối', async () => {
     let calls = 0
-    const send = vi.fn(async () => {
+    const send = mock(async () => {
       calls++
       throw new Error(`lỗi lần ${calls}`)
     })
@@ -96,7 +96,7 @@ describe('makeDiscordNotifier', () => {
   it('chờ đúng retryDelayMs trước khi thử lại', async () => {
     const waits: number[] = []
     let calls = 0
-    const send = vi.fn(async () => {
+    const send = mock(async () => {
       calls++
       if (calls === 1) throw new Error('tạm thời')
       return {}

@@ -1,3 +1,4 @@
+import type { Changes } from 'bun:sqlite'
 import { and, desc, eq, gte, lt, sql } from 'drizzle-orm'
 import type { CheckStats, Status } from '../shared/types.js'
 import type { Db } from './connection.js'
@@ -76,7 +77,8 @@ export function makeChecksRepo(db: Db): ChecksRepo {
     },
 
     deleteOlderThan(cutoffIso) {
-      return db.delete(checks).where(lt(checks.checkedAt, cutoffIso)).run().changes
+      return (db.delete(checks).where(lt(checks.checkedAt, cutoffIso)).run() as unknown as Changes)
+        .changes
     },
   }
 }

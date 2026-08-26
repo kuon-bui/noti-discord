@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import fs from 'node:fs'
 import path from 'node:path'
 import { Events } from 'discord.js'
@@ -38,7 +37,7 @@ async function main(): Promise<void> {
 
   const { raw, db } = openDb(config.dbPath)
   if (dbExisted && hasPendingMigrations(raw)) {
-    raw.pragma('wal_checkpoint(TRUNCATE)')
+    raw.exec('PRAGMA wal_checkpoint(TRUNCATE)')
     const backup = backupDbFile(config.dbPath, clock())
     if (backup) logger.info(`Đã backup DB trước migration sang ${backup}`)
   }

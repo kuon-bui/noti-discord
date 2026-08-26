@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'bun:test'
 import { addCommand } from '../../../src/bot/commands/add.js'
 import type { CommandContext, InteractionLike, InteractionReply } from '../../../src/bot/types.js'
 import { openTestDb } from '../../../src/db/connection.js'

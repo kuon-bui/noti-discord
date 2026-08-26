@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, jest, mock } from 'bun:test'
 import type { TargetsRepo } from '../../src/db/targets.repo.js'
 import { makeScheduler } from '../../src/monitor/scheduler.js'
 import type { Runner } from '../../src/monitor/runner.js'
@@ -27,7 +27,7 @@ function target(name: string, id: number): Target {
 function setup(due: Target[], runCheck?: Runner['runCheck']) {
   const calls: string[] = []
   const targets = {
-    findDue: vi.fn(() => due),
+    findDue: mock(() => due),
   } as unknown as TargetsRepo
 
   const runner = {
@@ -54,6 +54,10 @@ function setup(due: Target[], runCheck?: Runner['runCheck']) {
   })
 
   return { scheduler, calls, targets, runner }
+}
+
+async function flushMicrotasks(rounds = 20): Promise<void> {
+  for (let i = 0; i < rounds; i++) await Promise.resolve()
 }
 
 describe('scheduler.tick', () => {
@@ -95,21 +99,24 @@ describe('scheduler.tick', () => {
 
 describe('scheduler.start và stop', () => {
   it('start chạy tick theo chu kỳ, stop thì dừng', async () => {
-    vi.useFakeTimers()
+    jest.useFakeTimers()
     try {
       const context = setup([target('a', 1)])
       context.scheduler.start()
 
-      await vi.advanceTimersByTimeAsync(10_000)
-      await vi.advanceTimersByTimeAsync(10_000)
+      jest.advanceTimersByTime(10_000)
+      await flushMicrotasks()
+      jest.advanceTimersByTime(10_000)
+      await flushMicrotasks()
       const afterTwoTicks = context.calls.length
       expect(afterTwoTicks).toBeGreaterThanOrEqual(2)
 
       context.scheduler.stop()
-      await vi.advanceTimersByTimeAsync(30_000)
+      jest.advanceTimersByTime(30_000)
+      await flushMicrotasks()
       expect(context.calls.length).toBe(afterTwoTicks)
     } finally {
-      vi.useRealTimers()
+      jest.useRealTimers()
     }
   })
 

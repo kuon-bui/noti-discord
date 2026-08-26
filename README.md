@@ -4,7 +4,7 @@ Daemon theo dõi HTTP/HTTPS endpoint và gửi thông báo vào Discord khi tr�
 
 ## Yêu cầu
 
-Node.js >= 25.
+Bun >= 1.3.
 
 ## Dựng bot trên Discord
 
@@ -21,27 +21,26 @@ Không cần intent privileged nào. Bot chỉ dùng intent `Guilds`.
 ## Cài đặt
 
 ```bash
-npm install
+bun install
 cp .env.example .env   # rồi điền giá trị thật
-npm run db:generate    # chỉ cần khi đã sửa src/db/schema.ts
-npm run db:migrate
-npm run deploy-commands
-npm run dev
+bun run db:generate    # chỉ cần khi đã sửa src/db/schema.ts
+bun run db:migrate
+bun run deploy-commands
+bun run dev
 ```
 
 ## Script
 
 | Lệnh | Việc |
 |---|---|
-| `npm run dev` | Chạy ở chế độ dev, tự reload |
-| `npm run build` && `npm start` | Build ra `dist/` rồi chạy |
-| `npm test` | Chạy toàn bộ test |
-| `npm run typecheck` | Kiểm tra kiểu, không xuất file |
-| `npm run db:generate` | Sinh migration sau khi sửa `schema.ts` |
-| `npm run db:migrate` | Áp migration vào DB |
-| `npm run db:studio` | Mở UI xem dữ liệu |
-| `npm run db:drift` | Chặn `schema.ts` lệch với `drizzle/` |
-| `npm run deploy-commands` | Đăng ký slash command vào guild |
+| `bun run dev` | Chạy ở chế độ dev, tự reload |
+| `bun start` | Chạy thẳng mã nguồn, không cần build |
+| `bun test` | Chạy toàn bộ test |
+| `bun run typecheck` | Kiểm tra kiểu, không xuất file |
+| `bun run db:generate` | Sinh migration sau khi sửa `schema.ts` |
+| `bun run db:migrate` | Áp migration vào DB |
+| `bun run db:drift` | Chặn `schema.ts` lệch với `drizzle/` |
+| `bun run deploy-commands` | Đăng ký slash command vào guild |
 
 ## Slash command
 
@@ -75,54 +74,49 @@ Lệnh admin chỉ nhận user ID có trong `ADMIN_USER_IDS`.
 ## Đổi schema DB
 
 1. Sửa `src/db/schema.ts`.
-2. `npm run db:generate`.
+2. `bun run db:generate`.
 3. **Đọc file SQL sinh ra trong `drizzle/`** rồi commit nó cùng thay đổi schema.
-4. `npm run db:migrate`.
+4. `bun run db:migrate`.
 
 Migration là forward-only, không có `down`. App chỉ backup file DB khi phát hiện
 có migration mới chưa áp và giữ 1 bản gần nhất để không làm đầy quota lưu trữ.
 Không dùng `drizzle-kit push` — nó không để lại file migration nên làm mất lịch sử
 schema.
 
+Không còn script `db:studio`: `drizzle-kit` chỉ kết nối SQLite qua `better-sqlite3`
+hoặc `@libsql/client`, nó không hỗ trợ `bun:sqlite`, và giữ một native module chỉ để
+xem dữ liệu thì không đáng. Khi cần nhìn vào DB, hoặc mở thẳng file `.db` bằng một
+SQLite browser bất kỳ, hoặc cài tạm rồi gỡ đi.
+
+```bash
+bun add -D better-sqlite3 && bunx drizzle-kit studio
+```
+
 ## Deploy
 
-`better-sqlite3` là native module, nên khi đóng Docker image:
+Không còn native module nào, nên không còn ràng buộc về base image, glibc/musl hay
+rebuild khi đổi máy. Điều duy nhất còn quan trọng: **mount volume cho thư mục chứa file
+SQLite** (`./data`), vì filesystem của Fly.io và Railway là ephemeral. Trên Fly.io nhớ
+tắt autostop để process không bị suspend.
 
-- Dùng base `node:<ver>-slim` (debian), không dùng alpine — alpine dùng musl nên
-  prebuild glibc không nạp được.
-- Chạy `npm ci` bên trong image, đừng copy `node_modules` từ máy Windows sang.
-- Nếu dùng multi-stage build thì stage runtime phải cùng base image với stage build.
-- Mount volume cho thư mục chứa file SQLite (`./data`), vì filesystem của Fly.io và
-  Railway là ephemeral. Trên Fly.io nhớ tắt autostop để process không bị suspend.
-
-`npm install`/`npm ci` tự chạy `postinstall` để build ra `dist/`. Migration DB không
-cần chạy tay — `main()` trong `src/index.ts` tự backup khi cần và chạy
-`applyMigrations` mỗi lần process khởi động. Lịch sử check hết hạn cũng được dọn
-ngay khi khởi động và trước mỗi digest, kể cả khi gửi Discord thất bại.
+Không có bước build. `bun src/index.ts` chạy thẳng mã nguồn. Migration DB không cần chạy
+tay — `main()` trong `src/index.ts` tự backup khi cần và chạy `applyMigrations` mỗi lần
+process khởi động. Lịch sử check hết hạn cũng được dọn ngay khi khởi động và trước mỗi
+digest, kể cả khi gửi Discord thất bại.
 
 ### Wispbyte (hoặc panel Pterodactyl khác)
 
-Không cần Dockerfile — panel chạy app theo egg Node.js có sẵn.
+Không cần Dockerfile — panel chạy app trực tiếp.
 
-1. Tạo server, chọn egg Node.js. Kiểm tra version egg hỗ trợ có `>=25` không
-   (`engines.node` trong `package.json`); nếu panel chưa có Node 25, hạ tạm
-   `engines.node` xuống bản panel hỗ trợ rồi chạy lại `npm test`/`typecheck` để
-   xác nhận không có gì vỡ trước khi đổi.
-2. Đưa code lên bằng file manager/SFTP hoặc git pull qua console — **không copy
-   `node_modules` từ Windows**, để panel tự `npm install`/`npm ci` build lại
-   `better-sqlite3` đúng glibc của container.
+1. Tạo server, chọn egg Bun (hoặc egg cho phép tự cài Bun binary trong container).
+2. Đưa code lên bằng file manager/SFTP hoặc git pull qua console, rồi chạy `bun install`.
 3. Điền toàn bộ biến trong `.env.example` vào tab **Startup/Variables** của panel.
-4. Đảm bảo thư mục `data/` (giá trị `DB_PATH`) nằm trong phần lưu trữ persistent
-   của server, không bị xoá giữa các lần restart.
-5. Startup command: `node dist/index.js` (đã có `dist/` nhờ `postinstall`).
-6. Chạy `npm run deploy-commands` một lần qua console panel sau khi đã điền
-   `DISCORD_TOKEN`/`DISCORD_CLIENT_ID` để đăng ký slash command — bước này không
-   tự động, vì đăng ký lại mỗi lần deploy có thể dư thừa/hit rate limit.
-
-Lưu ý: `postinstall` gọi `npm run build` (`tsc`), cần `typescript` trong
-`devDependencies` đã được cài. Nếu egg cấu hình install command với
-`--omit=dev`/`NODE_ENV=production`, `postinstall` sẽ fail vì thiếu `tsc` — khi đó
-bỏ cờ đó đi hoặc build tay bằng `npm run build` sau khi cài xong.
+4. Đảm bảo thư mục `data/` (giá trị `DB_PATH`) nằm trong phần lưu trữ persistent của
+   server, không bị xoá giữa các lần restart.
+5. Startup command: `bun src/index.ts`.
+6. Chạy `bun run deploy-commands` một lần qua console panel sau khi đã điền
+   `DISCORD_TOKEN`/`DISCORD_CLIENT_ID` để đăng ký slash command — bước này không tự động,
+   vì đăng ký lại mỗi lần deploy có thể dư thừa hoặc hit rate limit.
 
 ## Vận hành an toàn
 

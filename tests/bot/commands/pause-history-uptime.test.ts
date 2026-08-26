@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'bun:test'
 import { historyCommand } from '../../../src/bot/commands/history.js'
 import { pauseCommand, resumeCommand } from '../../../src/bot/commands/pause.js'
 import { uptimeCommand } from '../../../src/bot/commands/uptime.js'

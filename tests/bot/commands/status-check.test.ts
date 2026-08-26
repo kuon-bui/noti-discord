@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, mock } from 'bun:test'
 import { checkCommand } from '../../../src/bot/commands/check.js'
 import { statusCommand } from '../../../src/bot/commands/status.js'
 import type {
@@ -47,12 +47,12 @@ function interaction(commandName: string, name?: string) {
 }
 
 let context: CommandContext
-let checkByName: ReturnType<typeof vi.fn>
+let checkByName: ReturnType<typeof mock>
 
 beforeEach(async () => {
   const { db } = openTestDb()
   await applyMigrations(db)
-  checkByName = vi.fn(async () => null)
+  checkByName = mock(async () => null)
   context = {
     targets: makeTargetsRepo(db),
     checks: makeChecksRepo(db),

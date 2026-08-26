@@ -1,22 +1,22 @@
-import Database from 'better-sqlite3'
-import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
+import Database from 'bun:sqlite'
+import { drizzle, type BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import * as schema from './schema.js'
 
-export type Db = BetterSQLite3Database<typeof schema>
+export type Db = BunSQLiteDatabase<typeof schema>
 
-export type OpenedDb = { raw: Database.Database; db: Db }
+export type OpenedDb = { raw: Database; db: Db }
 
 export function openDb(path: string): OpenedDb {
   const raw = new Database(path)
-  raw.pragma('journal_mode = WAL')
-  raw.pragma('foreign_keys = ON')
+  raw.exec('PRAGMA journal_mode = WAL')
+  raw.exec('PRAGMA foreign_keys = ON')
   const db = drizzle(raw, { schema })
   return { raw, db }
 }
 
 export function openTestDb(): OpenedDb {
   const raw = new Database(':memory:')
-  raw.pragma('foreign_keys = ON')
+  raw.exec('PRAGMA foreign_keys = ON')
   const db = drizzle(raw, { schema })
   return { raw, db }
 }
