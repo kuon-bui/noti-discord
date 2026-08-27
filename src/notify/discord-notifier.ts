@@ -41,6 +41,8 @@ export function makeDiscordNotifier(deps: DiscordNotifierDeps): Notifier {
     ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
 
   return {
+    provider: 'discord',
+
     async send(message: AlertMessage, channelId: string): Promise<void> {
       const channel = asSendable(await deps.client.channels.fetch(channelId), channelId)
       const payload = { embeds: [toEmbed(message)] }
