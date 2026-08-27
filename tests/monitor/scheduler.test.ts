@@ -15,7 +15,6 @@ function target(name: string, id: number): Target {
     latencyThresholdMs: null,
     intervalSeconds: 60,
     timeoutMs: 10_000,
-    alertChannelId: null,
     pausedUntil: null,
     currentStatus: 'UP',
     lastCheckedAt: null,

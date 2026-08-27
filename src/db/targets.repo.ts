@@ -12,7 +12,6 @@ export type CreateTargetInput = {
   latencyThresholdMs?: number | null
   intervalSeconds: number
   timeoutMs: number
-  alertChannelId?: string | null
   createdBy: string
   createdAt: string
 }
@@ -29,7 +28,6 @@ function toTarget(row: Row): Target {
     latencyThresholdMs: row.latencyThresholdMs,
     intervalSeconds: row.intervalSeconds,
     timeoutMs: row.timeoutMs,
-    alertChannelId: row.alertChannelId,
     pausedUntil: row.pausedUntil,
     currentStatus: row.currentStatus as Status,
     lastCheckedAt: row.lastCheckedAt,
@@ -62,7 +60,6 @@ export function makeTargetsRepo(db: Db): TargetsRepo {
           latencyThresholdMs: input.latencyThresholdMs ?? null,
           intervalSeconds: input.intervalSeconds,
           timeoutMs: input.timeoutMs,
-          alertChannelId: input.alertChannelId ?? null,
           createdAt: input.createdAt,
           createdBy: input.createdBy,
         })

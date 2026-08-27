@@ -95,6 +95,21 @@ describe('applyMigrations', () => {
     expect(left.n).toBe(0)
     raw.close()
   })
+
+  it('backfill không sinh destination rác', async () => {
+    const { raw, db } = openTestDb()
+    await applyMigrations(db)
+
+    const rows = raw.prepare('SELECT provider, target_id FROM destinations').all() as Array<{
+      provider: string
+      target_id: number | null
+    }>
+
+    // DB test rỗng nên backfill không chèn gì; test này chặn việc SQL backfill
+    // vô tình chèn row khi không có dữ liệu cũ.
+    expect(rows).toEqual([])
+    raw.close()
+  })
 })
 
 describe('backupDbFile', () => {

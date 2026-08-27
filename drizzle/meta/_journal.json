@@ -15,6 +15,20 @@
       "when": 1787793522482,
       "tag": "0001_new_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1787796130536,
+      "tag": "0002_backfill_destinations",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1787796199464,
+      "tag": "0003_wonderful_ink",
+      "breakpoints": true
     }
   ]
 }

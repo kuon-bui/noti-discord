@@ -52,7 +52,6 @@ function target(overrides: Partial<Target> = {}): Target {
     latencyThresholdMs: null,
     intervalSeconds: 60,
     timeoutMs: 2_000,
-    alertChannelId: null,
     pausedUntil: null,
     currentStatus: 'UNKNOWN',
     lastCheckedAt: null,

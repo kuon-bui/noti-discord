@@ -9,7 +9,6 @@ export type Target = {
   latencyThresholdMs: number | null
   intervalSeconds: number
   timeoutMs: number
-  alertChannelId: string | null
   pausedUntil: string | null
   currentStatus: Status
   lastCheckedAt: string | null

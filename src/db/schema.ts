@@ -9,7 +9,6 @@ export const targets = sqliteTable('targets', {
   latencyThresholdMs: integer('latency_threshold_ms'),
   intervalSeconds: integer('interval_seconds').notNull(),
   timeoutMs: integer('timeout_ms').notNull(),
-  alertChannelId: text('alert_channel_id'),
   pausedUntil: text('paused_until'),
   currentStatus: text('current_status').notNull().default('UNKNOWN'),
   lastCheckedAt: text('last_checked_at'),

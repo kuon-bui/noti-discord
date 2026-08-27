@@ -75,16 +75,25 @@ export const addCommand: Command = {
         return
       }
 
-      context.targets.create({
+      const createdAt = context.clock().toISOString()
+      const created = context.targets.create({
         name,
         url,
         intervalSeconds,
         timeoutMs,
         latencyThresholdMs,
-        alertChannelId,
         createdBy: interaction.user.id,
-        createdAt: context.clock().toISOString(),
+        createdAt,
       })
+
+      if (alertChannelId !== null) {
+        context.destinations.add({
+          targetId: created.id,
+          provider: 'discord',
+          address: alertChannelId,
+          createdAt,
+        })
+      }
 
       await interaction.reply({
         content: `Đã thêm \`${name}\` → ${redactUrlForDisplay(url)} (mỗi ${intervalSeconds}s, timeout ${timeoutMs}ms).`,

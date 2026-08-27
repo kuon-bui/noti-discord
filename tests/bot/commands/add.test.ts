@@ -92,7 +92,16 @@ describe('/add', () => {
     expect(target?.intervalSeconds).toBe(120)
     expect(target?.timeoutMs).toBe(5_000)
     expect(target?.latencyThresholdMs).toBe(800)
-    expect(target?.alertChannelId).toBe('chan-9')
+
+    const rows = context.destinations.listForTarget(target!.id)
+    expect(rows.map((r) => `${r.provider}:${r.address}`)).toEqual(['discord:chan-9'])
+  })
+
+  it('không truyền channel thì không tạo destination nào', async () => {
+    const { interaction: value } = interaction({ name: 'web', url: 'https://a.test' })
+    await addCommand.execute(context, value)
+    const target = context.targets.findByName('web')
+    expect(context.destinations.listForTarget(target!.id)).toEqual([])
   })
 
   it('che query URL trong xác nhận public nhưng vẫn lưu URL để probe', async () => {

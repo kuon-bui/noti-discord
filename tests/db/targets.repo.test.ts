@@ -38,17 +38,13 @@ describe('TargetsRepo', () => {
     expect(target.expectedStatus).toBe('200-299')
     expect(target.currentStatus).toBe('UNKNOWN')
     expect(target.latencyThresholdMs).toBeNull()
-    expect(target.alertChannelId).toBeNull()
     expect(target.pausedUntil).toBeNull()
     expect(target.lastCheckedAt).toBeNull()
   })
 
   it('create nhận giá trị tuỳ chọn', () => {
-    const target = repo.create(
-      input({ latencyThresholdMs: 500, alertChannelId: '999', expectedStatus: '204' }),
-    )
+    const target = repo.create(input({ latencyThresholdMs: 500, expectedStatus: '204' }))
     expect(target.latencyThresholdMs).toBe(500)
-    expect(target.alertChannelId).toBe('999')
     expect(target.expectedStatus).toBe('204')
   })
 
