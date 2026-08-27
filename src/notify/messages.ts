@@ -70,7 +70,7 @@ export function manualCheckMessage(outcome: CheckOutcome, atIso: string): AlertM
   }
 }
 
-const STATUS_ICON: Record<string, string> = {
+export const STATUS_ICON: Record<string, string> = {
   UP: '🟢',
   DEGRADED: '🟡',
   DOWN: '🔴',
