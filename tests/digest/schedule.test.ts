@@ -51,6 +51,11 @@ function seed(targets: ReturnType<typeof makeTargetsRepo>, name: string) {
   })
 }
 
+/** digestMessage trả bảng dạng dữ liệu (table.rows), không còn pad sẵn vào description. */
+function digestTableFlat(sent: Sent[]): string {
+  return (sent[0]?.msg.table?.rows ?? []).flat().join('|')
+}
+
 const AT_9AM_VN = '2026-08-24T02:00:00.000Z'
 const AT_8AM_VN = '2026-08-24T01:00:00.000Z'
 const AT_2PM_VN = '2026-08-24T07:00:00.000Z'
@@ -123,7 +128,7 @@ describe('digestJob.maybeSend', () => {
   it('không có target nào thì vẫn gửi báo cáo rỗng', async () => {
     const context = await setup(AT_9AM_VN)
     expect((await context.job.maybeSend()).sent).toBe(true)
-    expect(context.sent[0]?.msg.description).toContain('Chưa có target')
+    expect(context.sent[0]?.msg.table?.rows).toHaveLength(0)
   })
 
   it('đánh dấu target đang pause', async () => {
@@ -131,7 +136,7 @@ describe('digestJob.maybeSend', () => {
     const target = seed(context.targets, 'staging')
     context.targets.setPause(target.id, '2026-08-25T00:00:00.000Z')
     await context.job.maybeSend()
-    expect(context.sent[0]?.msg.description).toContain('paused')
+    expect(digestTableFlat(context.sent)).toContain('paused')
   })
 
   it('target hết hạn pause thì không còn nhãn paused', async () => {
@@ -139,7 +144,7 @@ describe('digestJob.maybeSend', () => {
     const target = seed(context.targets, 'staging')
     context.targets.setPause(target.id, '2026-08-24T01:00:00.000Z')
     await context.job.maybeSend()
-    expect(context.sent[0]?.msg.description).not.toContain('paused')
+    expect(digestTableFlat(context.sent)).not.toContain('paused')
   })
 
   it('dọn check cũ hơn CHECK_RETENTION_DAYS và giữ check mới', async () => {
@@ -186,6 +191,6 @@ describe('digestJob.maybeSend', () => {
     })
 
     await context.job.maybeSend()
-    expect(context.sent[0]?.msg.description).toContain('50%')
+    expect(digestTableFlat(context.sent)).toContain('50%')
   })
 })

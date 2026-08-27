@@ -34,6 +34,7 @@ export function downMessage(target: Target, result: ProbeResult, atIso: string):
       { name: 'Ngưỡng status', value: target.expectedStatus, inline: true },
     ],
     timestampIso: atIso,
+    targetName: target.name,
   }
 }
 
@@ -48,6 +49,7 @@ export function recoveredMessage(target: Target, downtimeMs: number, atIso: stri
       { name: 'Thời gian gián đoạn', value: formatDuration(downtimeMs), inline: true },
     ],
     timestampIso: atIso,
+    targetName: target.name,
   }
 }
 
@@ -64,6 +66,7 @@ export function manualCheckMessage(outcome: CheckOutcome, atIso: string): AlertM
       { name: 'Kết quả', value: reasonOf(outcome.result), inline: true },
     ],
     timestampIso: atIso,
+    targetName: outcome.target.name,
   }
 }
 
@@ -75,21 +78,22 @@ const STATUS_ICON: Record<string, string> = {
 }
 
 export function digestMessage(report: DigestReport, atIso: string): AlertMessage {
-  const rows = report.lines.map((line) => {
-    const uptime = line.uptimePct == null ? 'chưa có dữ liệu' : `${line.uptimePct}%`
-    const latency = line.avgLatencyMs == null ? '-' : `${line.avgLatencyMs}ms`
-    const tag = line.paused ? ' (paused)' : ''
-    return `${STATUS_ICON[line.currentStatus] ?? '⚪'} ${line.name.padEnd(16)}${uptime.padStart(14)}  ${latency.padStart(8)}  ${String(line.incidentCount).padStart(3)} sự cố  ${formatDuration(line.downtimeMs)}${tag}`
-  })
-
-  const body = rows.length > 0 ? rows.join('\n') : 'Chưa có target nào được theo dõi.'
+  const rows = report.lines.map((line) => [
+    STATUS_ICON[line.currentStatus] ?? '⚪',
+    line.name,
+    line.uptimePct == null ? 'chưa có dữ liệu' : `${line.uptimePct}%`,
+    line.avgLatencyMs == null ? '-' : `${line.avgLatencyMs}ms`,
+    String(line.incidentCount),
+    `${formatDuration(line.downtimeMs)}${line.paused ? ' (paused)' : ''}`,
+  ])
 
   return {
     kind: 'digest',
     title: `📊 Báo cáo tình trạng — ${report.rangeLabel}`,
-    description: `\`\`\`\n${body}\n\`\`\``,
+    description: '',
     color: COLOR_INFO,
     fields: [{ name: 'Số target', value: String(report.lines.length), inline: true }],
     timestampIso: atIso,
+    table: { rows },
   }
 }

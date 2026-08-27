@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import { toEmbed } from '../../src/notify/embeds.js'
-import type { AlertMessage } from '../../src/shared/types.js'
+import { digestMessage } from '../../src/notify/messages.js'
+import type { AlertMessage, DigestReport } from '../../src/shared/types.js'
 
 function message(overrides: Partial<AlertMessage> = {}): AlertMessage {
   return {
@@ -76,5 +77,38 @@ describe('toEmbed', () => {
       (json.description?.length ?? 0) +
       (json.fields ?? []).reduce((sum, field) => sum + field.name.length + field.value.length, 0)
     expect(total).toBeLessThanOrEqual(6_000)
+  })
+})
+
+describe('toEmbed với table', () => {
+  const report: DigestReport = {
+    rangeLabel: '24 giờ qua',
+    lines: [
+      {
+        name: 'web-prod',
+        currentStatus: 'UP',
+        paused: false,
+        uptimePct: 99.9,
+        avgLatencyMs: 120,
+        incidentCount: 1,
+        downtimeMs: 65_000,
+      },
+    ],
+  }
+
+  it('render table thành code block với cột đã pad', () => {
+    const json = toEmbed(digestMessage(report, '2026-08-26T00:00:00.000Z')).toJSON()
+    // Chuỗi mong đợi lấy từ output thật của digestMessage trên code trước khi sửa
+    // (chạy digestMessage với report này rồi copy description ra), không đếm khoảng trắng bằng mắt.
+    expect(json.description).toBe(
+      '```\n🟢 web-prod                 99.9%     120ms    1 sự cố  1m 5s\n```',
+    )
+  })
+
+  it('table rỗng vẫn có câu thay thế', () => {
+    const json = toEmbed(
+      digestMessage({ rangeLabel: '24 giờ qua', lines: [] }, '2026-08-26T00:00:00.000Z'),
+    ).toJSON()
+    expect(json.description).toBe('```\nChưa có target nào được theo dõi.\n```')
   })
 })

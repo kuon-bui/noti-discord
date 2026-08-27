@@ -177,18 +177,21 @@ describe('digestMessage', () => {
     expect(message.title).toContain('24 giờ qua')
   })
 
-  it('liệt kê đủ mọi target trong description', () => {
-    expect(message.description).toContain('web-prod')
-    expect(message.description).toContain('api')
-    expect(message.description).toContain('staging')
+  it('liệt kê đủ mọi target trong table', () => {
+    const names = message.table?.rows.map((cells) => cells[1])
+    expect(names).toContain('web-prod')
+    expect(names).toContain('api')
+    expect(names).toContain('staging')
   })
 
   it('hiển thị uptime và đánh dấu target đang pause', () => {
-    expect(message.description).toContain('99.9%')
-    expect(message.description).toContain('paused')
+    const flat = (message.table?.rows ?? []).flat().join('|')
+    expect(flat).toContain('99.9%')
+    expect(flat).toContain('(paused)')
   })
 
-  it('target chưa có dữ liệu thì không in NaN', () => {
-    expect(message.description).not.toContain('NaN')
+  it('không tự format bảng vào description', () => {
+    expect(message.description).toBe('')
+    expect(message.table?.rows).toHaveLength(3)
   })
 })

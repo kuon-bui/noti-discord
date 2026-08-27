@@ -39,6 +39,10 @@ export type AlertMessage = {
   color: number
   fields: AlertField[]
   timestampIso: string
+  /** Tên target liên quan, để outbox gộp được theo target. Digest không có. */
+  targetName?: string
+  /** Dữ liệu bảng chưa format. Provider tự render. 6 ô: icon, name, uptime, latency, incidents, downtime. */
+  table?: { rows: string[][] }
 }
 
 export type Incident = {
