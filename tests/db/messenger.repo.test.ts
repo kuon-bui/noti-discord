@@ -57,6 +57,12 @@ describe('MessengerRepo', () => {
       expect(repo.unlink('psid-1')).toBe(true)
       expect(repo.findIdentity('psid-1')).toBeNull()
     })
+
+    it('findPsidByDiscordUserId tìm PSID qua Discord ID', () => {
+      repo.link({ psid: 'psid-1', discordUserId: 'd1', isAdmin: true, atIso: NOW })
+      expect(repo.findPsidByDiscordUserId('d1')).toBe('psid-1')
+      expect(repo.findPsidByDiscordUserId('d-lạ')).toBeNull()
+    })
   })
 
   describe('link code', () => {

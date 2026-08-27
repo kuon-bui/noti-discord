@@ -3,6 +3,7 @@ import { makeChecksRepo } from '../../src/db/checks.repo.js'
 import type { Db } from '../../src/db/connection.js'
 import { makeDestinationsRepo } from '../../src/db/destinations.repo.js'
 import { makeIncidentsRepo } from '../../src/db/incidents.repo.js'
+import { makeMessengerRepo } from '../../src/db/messenger.repo.js'
 import { makeTargetsRepo } from '../../src/db/targets.repo.js'
 import type { Runner } from '../../src/monitor/runner.js'
 import { silentLogger } from '../../src/shared/logger.js'
@@ -19,6 +20,7 @@ export function makeTestContext(db: Db, overrides: Partial<CommandContext> = {})
     checks: makeChecksRepo(db),
     incidents: makeIncidentsRepo(db),
     destinations: makeDestinationsRepo(db),
+    messenger: makeMessengerRepo(db),
     runner: {} as Runner,
     config: {
       defaultIntervalSeconds: 60,

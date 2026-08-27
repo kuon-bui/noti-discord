@@ -3,6 +3,8 @@ import { checkCommand } from './check.js'
 import { destAddCommand, destListCommand, destRemoveCommand } from './dest.js'
 import { historyCommand } from './history.js'
 import { listCommand } from './list.js'
+import { messengerLinkCommand } from './messenger-link.js'
+import { messengerUnlinkCommand } from './messenger-unlink.js'
 import { pauseCommand, resumeCommand } from './pause.js'
 import { removeCommand } from './remove.js'
 import { statusCommand } from './status.js'
@@ -23,5 +25,7 @@ export function allCommands(): Command[] {
     destListCommand,
     destAddCommand,
     destRemoveCommand,
+    messengerLinkCommand,
+    messengerUnlinkCommand,
   ]
 }

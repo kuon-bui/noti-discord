@@ -2,6 +2,7 @@ import type { AppConfig } from '../config.js'
 import type { ChecksRepo } from '../db/checks.repo.js'
 import type { DestinationsRepo } from '../db/destinations.repo.js'
 import type { IncidentsRepo } from '../db/incidents.repo.js'
+import type { MessengerRepo } from '../db/messenger.repo.js'
 import type { TargetsRepo } from '../db/targets.repo.js'
 import type { Runner } from '../monitor/runner.js'
 import type { Logger } from '../shared/logger.js'
@@ -40,6 +41,7 @@ export type CommandContext = {
   checks: ChecksRepo
   incidents: IncidentsRepo
   destinations: DestinationsRepo
+  messenger: MessengerRepo
   runner: Runner
   config: AppConfig
   clock: Clock

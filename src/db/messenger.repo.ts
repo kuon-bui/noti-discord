@@ -25,6 +25,7 @@ export type LinkInput = {
 
 export type MessengerRepo = {
   findIdentity(psid: string): MessengerIdentity | null
+  findPsidByDiscordUserId(discordUserId: string): string | null
   adminPsids(): string[]
   /** Chỉ update. PSID chưa link thì không có hàng nào để chạm. */
   touchInbound(psid: string, atIso: string): void
@@ -57,6 +58,15 @@ export function makeMessengerRepo(db: Db): MessengerRepo {
         .where(eq(messengerIdentities.psid, psid))
         .get()
       return row ? toIdentity(row) : null
+    },
+
+    findPsidByDiscordUserId(discordUserId) {
+      const row = db
+        .select()
+        .from(messengerIdentities)
+        .where(eq(messengerIdentities.discordUserId, discordUserId))
+        .get()
+      return row?.psid ?? null
     },
 
     adminPsids() {
