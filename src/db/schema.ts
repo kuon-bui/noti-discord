@@ -1,4 +1,4 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 export const targets = sqliteTable('targets', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -16,6 +16,23 @@ export const targets = sqliteTable('targets', {
   createdAt: text('created_at').notNull(),
   createdBy: text('created_by').notNull(),
 })
+
+export const destinations = sqliteTable(
+  'destinations',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    targetId: integer('target_id').references(() => targets.id, { onDelete: 'cascade' }),
+    provider: text('provider').notNull(),
+    address: text('address').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [
+    index('idx_destinations_target').on(t.targetId, t.provider),
+    // Chỉ chặn được trùng khi target_id NOT NULL — SQLite coi các NULL là khác nhau.
+    // Row toàn cục được chống trùng ở tầng repo.
+    uniqueIndex('idx_destinations_unique').on(t.targetId, t.provider, t.address),
+  ],
+)
 
 export const checks = sqliteTable(
   'checks',
