@@ -91,3 +91,18 @@ export const messengerSeenMids = sqliteTable(
   },
   (t) => [index('idx_messenger_seen_mids_time').on(t.seenAt)],
 )
+
+export const outbox = sqliteTable(
+  'outbox',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    provider: text('provider').notNull(),
+    address: text('address').notNull(),
+    targetName: text('target_name'),
+    payload: text('payload').notNull(),
+    createdAt: text('created_at').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    lastError: text('last_error'),
+  },
+  (t) => [index('idx_outbox_addr').on(t.provider, t.address, t.createdAt)],
+)
