@@ -1,12 +1,10 @@
-import type { AppConfig } from '../config.js'
 import type { Logger } from '../shared/logger.js'
-import { isAdmin } from './permissions.js'
 import { EPHEMERAL, type Command, type CommandContext, type InteractionLike } from './types.js'
 
 export type RouterDeps = {
   commands: readonly Command[]
   ctx: CommandContext
-  config: Pick<AppConfig, 'adminUserIds'>
+  isAdmin: (userId: string) => boolean
   logger: Logger
 }
 
@@ -36,7 +34,7 @@ export function makeRouter(deps: RouterDeps): Router {
         return
       }
 
-      if (command.adminOnly && !isAdmin(interaction.user.id, deps.config)) {
+      if (command.adminOnly && !deps.isAdmin(interaction.user.id)) {
         await replySafe(interaction, 'Bạn không có quyền dùng lệnh này.')
         return
       }

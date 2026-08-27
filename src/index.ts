@@ -3,6 +3,7 @@ import { Events } from 'discord.js'
 import { createClient } from './bot/client.js'
 import { allCommands } from './bot/commands/index.js'
 import { makeRouter } from './bot/router.js'
+import { isAdmin } from './bot/permissions.js'
 import type { InteractionLike } from './bot/types.js'
 import { loadConfig } from './config.js'
 import { makeChecksRepo } from './db/checks.repo.js'
@@ -104,7 +105,7 @@ async function main(): Promise<void> {
   const router = makeRouter({
     commands: allCommands(),
     ctx: { targets, checks, incidents, destinations, runner, config, clock, logger },
-    config,
+    isAdmin: (userId) => isAdmin(userId, config),
     logger,
   })
 

@@ -45,7 +45,7 @@ function setup(commands: Command[]) {
   const router = makeRouter({
     commands,
     ctx,
-    config: { adminUserIds: ['admin-1'] },
+    isAdmin: (id) => id === 'admin-1',
     logger: silentLogger,
   })
   return { router }
@@ -187,5 +187,39 @@ describe('router.handle', () => {
     const { interaction } = fakeInteraction('status', 'user-1')
 
     await expect(router.handle(interaction)).resolves.toBeUndefined()
+  })
+
+  it('hai router instance không dùng chung khoá chống chạy trùng', async () => {
+    let running = 0
+    const slow: Command = {
+      name: 'slow',
+      adminOnly: false,
+      data: { name: 'slow', toJSON: () => ({ name: 'slow' }) },
+      async execute() {
+        running += 1
+        await new Promise((resolve) => setTimeout(resolve, 5))
+      },
+    }
+
+    const ctx = {} as CommandContext
+    const discord = makeRouter({
+      commands: [slow],
+      ctx,
+      isAdmin: () => true,
+      logger: silentLogger,
+    })
+    const messenger = makeRouter({
+      commands: [slow],
+      ctx,
+      isAdmin: () => true,
+      logger: silentLogger,
+    })
+
+    await Promise.all([
+      discord.handle(fakeInteraction('slow', '12345').interaction),
+      messenger.handle(fakeInteraction('slow', '12345').interaction),
+    ])
+
+    expect(running).toBe(2)
   })
 })
