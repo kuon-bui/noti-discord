@@ -3,12 +3,8 @@ import { listCommand } from '../../../src/bot/commands/list.js'
 import { removeCommand } from '../../../src/bot/commands/remove.js'
 import type { CommandContext, InteractionLike, InteractionReply } from '../../../src/bot/types.js'
 import { openTestDb } from '../../../src/db/connection.js'
-import { makeChecksRepo } from '../../../src/db/checks.repo.js'
-import { makeIncidentsRepo } from '../../../src/db/incidents.repo.js'
 import { applyMigrations } from '../../../src/db/migrate.js'
-import { makeTargetsRepo } from '../../../src/db/targets.repo.js'
-import type { Runner } from '../../../src/monitor/runner.js'
-import { silentLogger } from '../../../src/shared/logger.js'
+import { makeTestContext } from '../../helpers/context.js'
 
 function interaction(commandName: string, name?: string) {
   const replies: InteractionReply[] = []
@@ -43,15 +39,7 @@ let context: CommandContext
 beforeEach(async () => {
   const { db } = openTestDb()
   await applyMigrations(db)
-  context = {
-    targets: makeTargetsRepo(db),
-    checks: makeChecksRepo(db),
-    incidents: makeIncidentsRepo(db),
-    runner: {} as Runner,
-    config: {} as CommandContext['config'],
-    clock: () => new Date('2026-08-24T00:00:00.000Z'),
-    logger: silentLogger,
-  }
+  context = makeTestContext(db)
 })
 
 function seed(name: string) {

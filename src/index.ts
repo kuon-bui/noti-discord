@@ -7,6 +7,7 @@ import type { InteractionLike } from './bot/types.js'
 import { loadConfig } from './config.js'
 import { makeChecksRepo } from './db/checks.repo.js'
 import { openDb } from './db/connection.js'
+import { makeDestinationsRepo } from './db/destinations.repo.js'
 import { makeIncidentsRepo } from './db/incidents.repo.js'
 import { makeMetaRepo } from './db/meta.repo.js'
 import {
@@ -45,6 +46,7 @@ async function main(): Promise<void> {
   const targets = makeTargetsRepo(db)
   const checks = makeChecksRepo(db)
   const incidents = makeIncidentsRepo(db)
+  const destinations = makeDestinationsRepo(db)
   const meta = makeMetaRepo(db)
 
   const cutoffIso = new Date(
@@ -88,7 +90,7 @@ async function main(): Promise<void> {
   })
   const router = makeRouter({
     commands: allCommands(),
-    ctx: { targets, checks, incidents, runner, config, clock, logger },
+    ctx: { targets, checks, incidents, destinations, runner, config, clock, logger },
     config,
     logger,
   })
