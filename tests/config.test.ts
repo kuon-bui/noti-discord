@@ -64,3 +64,74 @@ describe('loadConfig', () => {
     expect(Object.isFrozen(c)).toBe(true)
   })
 })
+
+describe('config messenger', () => {
+  const BASE = {
+    DISCORD_TOKEN: 't',
+    DISCORD_CLIENT_ID: 'c',
+    GUILD_ID: 'g',
+    DEFAULT_ALERT_CHANNEL_ID: 'a',
+    DIGEST_CHANNEL_ID: 'd',
+    ADMIN_USER_IDS: 'u1',
+  }
+
+  it('mặc định tắt và messenger là null', () => {
+    expect(loadConfig({ ...BASE } as NodeJS.ProcessEnv).messenger).toBeNull()
+  })
+
+  it('MESSENGER_ENABLED=false vẫn là null dù có secret', () => {
+    const config = loadConfig({
+      ...BASE,
+      MESSENGER_ENABLED: 'false',
+      MESSENGER_PAGE_ACCESS_TOKEN: 'p',
+      MESSENGER_APP_SECRET: 's',
+      MESSENGER_VERIFY_TOKEN: 'v',
+    } as NodeJS.ProcessEnv)
+    expect(config.messenger).toBeNull()
+  })
+
+  it('bật mà thiếu secret thì throw, và nêu đúng tên biến còn thiếu', () => {
+    expect(() =>
+      loadConfig({ ...BASE, MESSENGER_ENABLED: 'true' } as NodeJS.ProcessEnv),
+    ).toThrow(/MESSENGER_PAGE_ACCESS_TOKEN/)
+  })
+
+  it('bật đủ secret thì trả nhóm messenger với default đã áp', () => {
+    const config = loadConfig({
+      ...BASE,
+      MESSENGER_ENABLED: 'true',
+      MESSENGER_PAGE_ACCESS_TOKEN: 'p',
+      MESSENGER_APP_SECRET: 's',
+      MESSENGER_VERIFY_TOKEN: 'v',
+    } as NodeJS.ProcessEnv)
+
+    expect(config.messenger).toEqual({
+      pageAccessToken: 'p',
+      appSecret: 's',
+      verifyToken: 'v',
+      port: 8080,
+      webhookPath: '/webhook/messenger',
+      apiVersion: 'v21.0',
+      outboxMaxAgeHours: 48,
+    })
+  })
+
+  it('MESSENGER_ENABLED nhận giá trị lạ thì throw', () => {
+    expect(() =>
+      loadConfig({ ...BASE, MESSENGER_ENABLED: 'yes' } as NodeJS.ProcessEnv),
+    ).toThrow(/MESSENGER_ENABLED/)
+  })
+
+  it('webhook path phải bắt đầu bằng /', () => {
+    expect(() =>
+      loadConfig({
+        ...BASE,
+        MESSENGER_ENABLED: 'true',
+        MESSENGER_PAGE_ACCESS_TOKEN: 'p',
+        MESSENGER_APP_SECRET: 's',
+        MESSENGER_VERIFY_TOKEN: 'v',
+        MESSENGER_WEBHOOK_PATH: 'webhook',
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/MESSENGER_WEBHOOK_PATH/)
+  })
+})
