@@ -8,8 +8,19 @@ import { makeTargetsRepo } from '../../src/db/targets.repo.js'
 import { LAST_DIGEST_KEY, makeDigestJob } from '../../src/digest/schedule.js'
 import { silentLogger } from '../../src/shared/logger.js'
 import type { AlertMessage } from '../../src/shared/types.js'
+import type { Destination } from '../../src/notify/notifier.js'
 
-type Sent = { msg: AlertMessage; channelId: string }
+function fakeDispatcher() {
+  const sent: Array<{ kind: string; addresses: string[]; msg: AlertMessage }> = []
+  return {
+    sent,
+    dispatcher: {
+      async dispatch(msg: AlertMessage, dests: readonly Destination[]) {
+        sent.push({ kind: msg.kind, addresses: dests.map((d) => d.address), msg })
+      },
+    },
+  }
+}
 
 async function setup(nowIso: string, options: { failNotify?: boolean } = {}) {
   const { db } = openTestDb()
@@ -19,20 +30,26 @@ async function setup(nowIso: string, options: { failNotify?: boolean } = {}) {
   const checks = makeChecksRepo(db)
   const incidents = makeIncidentsRepo(db)
   const meta = makeMetaRepo(db)
-  const sent: Sent[] = []
+  const { sent, dispatcher: baseDispatcher } = fakeDispatcher()
+
+  const dispatcher = {
+    async dispatch(msg: AlertMessage, dests: readonly Destination[]) {
+      if (options.failNotify) throw new Error('Discord sập')
+      return baseDispatcher.dispatch(msg, dests)
+    },
+  }
 
   const job = makeDigestJob({
     targets,
     checks,
     incidents,
     meta,
-    notifier: {
-      send: async (message, channelId) => {
-        if (options.failNotify) throw new Error('Discord sập')
-        sent.push({ msg: message, channelId })
-      },
+    dispatcher,
+    routing: {
+      destinationsFor: () => [],
+      digestDestinations: () => [{ provider: 'discord', address: 'digest-chan' }],
     },
-    config: { digestHourLocal: 9, digestChannelId: 'digest-chan', checkRetentionDays: 30 },
+    config: { digestHourLocal: 9, checkRetentionDays: 30 },
     clock: () => new Date(nowIso),
     logger: silentLogger,
   })
@@ -52,7 +69,7 @@ function seed(targets: ReturnType<typeof makeTargetsRepo>, name: string) {
 }
 
 /** digestMessage trả bảng dạng dữ liệu (table.rows), không còn pad sẵn vào description. */
-function digestTableFlat(sent: Sent[]): string {
+function digestTableFlat(sent: Array<{ kind: string; addresses: string[]; msg: AlertMessage }>): string {
   return (sent[0]?.msg.table?.rows ?? []).flat().join('|')
 }
 
@@ -75,8 +92,8 @@ describe('digestJob.maybeSend', () => {
     const result = await context.job.maybeSend()
     expect(result.sent).toBe(true)
     expect(context.sent).toHaveLength(1)
-    expect(context.sent[0]?.channelId).toBe('digest-chan')
-    expect(context.sent[0]?.msg.kind).toBe('digest')
+    expect(context.sent[0]?.kind).toBe('digest')
+    expect(context.sent[0]?.addresses).toContain('digest-chan')
   })
 
   it('ghi ngày đã gửi vào meta theo lịch VN', async () => {
@@ -192,5 +209,39 @@ describe('digestJob.maybeSend', () => {
 
     await context.job.maybeSend()
     expect(digestTableFlat(context.sent)).toContain('50%')
+  })
+
+  it('digest tới DIGEST_CHANNEL_ID cộng mọi PSID admin', async () => {
+    const { db } = openTestDb()
+    await applyMigrations(db)
+
+    const targets = makeTargetsRepo(db)
+    const checks = makeChecksRepo(db)
+    const incidents = makeIncidentsRepo(db)
+    const meta = makeMetaRepo(db)
+
+    const { sent, dispatcher } = fakeDispatcher()
+    const job = makeDigestJob({
+      targets,
+      checks,
+      incidents,
+      meta,
+      dispatcher,
+      routing: {
+        destinationsFor: () => [],
+        digestDestinations: () => [
+          { provider: 'discord', address: 'digest-chan' },
+          { provider: 'messenger', address: 'psid-admin' },
+        ],
+      },
+      config: { digestHourLocal: 9, checkRetentionDays: 30 },
+      clock: () => new Date('2026-08-26T05:00:00.000Z'),
+      logger: silentLogger,
+    })
+
+    const result = await job.maybeSend()
+
+    expect(result.sent).toBe(true)
+    expect(sent[0]?.addresses).toEqual(['digest-chan', 'psid-admin'])
   })
 })

@@ -5,7 +5,8 @@ import type { IncidentsRepo } from '../db/incidents.repo.js'
 import type { MetaRepo } from '../db/meta.repo.js'
 import type { TargetsRepo } from '../db/targets.repo.js'
 import { digestMessage } from '../notify/messages.js'
-import type { Notifier } from '../notify/notifier.js'
+import type { Dispatcher } from '../notify/notifier.js'
+import type { Routing } from '../notify/routing.js'
 import type { Logger } from '../shared/logger.js'
 import { vnDateString, vnHour, type Clock } from '../shared/time.js'
 import type { Target } from '../shared/types.js'
@@ -19,8 +20,9 @@ export type DigestJobDeps = {
   checks: ChecksRepo
   incidents: IncidentsRepo
   meta: MetaRepo
-  notifier: Notifier
-  config: Pick<AppConfig, 'digestHourLocal' | 'digestChannelId' | 'checkRetentionDays'>
+  dispatcher: Dispatcher
+  routing: Routing
+  config: Pick<AppConfig, 'digestHourLocal' | 'checkRetentionDays'>
   clock: Clock
   logger: Logger
 }
@@ -67,7 +69,10 @@ export function makeDigestJob(deps: DigestJobDeps): DigestJob {
         deps.logger.info(`Đã dọn ${removed} dòng checks cũ hơn ${cutoffIso}`)
       }
 
-      await deps.notifier.send(digestMessage(report, nowIso), deps.config.digestChannelId)
+      await deps.dispatcher.dispatch(
+        digestMessage(report, nowIso),
+        deps.routing.digestDestinations(),
+      )
 
       deps.meta.set(LAST_DIGEST_KEY, today)
 
