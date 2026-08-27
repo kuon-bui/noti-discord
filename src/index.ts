@@ -22,6 +22,8 @@ import { makeHttpProbe } from './monitor/http-probe.js'
 import { makeRunner } from './monitor/runner.js'
 import { makeScheduler } from './monitor/scheduler.js'
 import { makeDiscordNotifier } from './notify/discord-notifier.js'
+import { makeDispatcher } from './notify/dispatcher.js'
+import { makeRouting } from './notify/routing.js'
 import { makeLogger } from './shared/logger.js'
 
 async function main(): Promise<void> {
@@ -46,8 +48,8 @@ async function main(): Promise<void> {
   const targets = makeTargetsRepo(db)
   const checks = makeChecksRepo(db)
   const incidents = makeIncidentsRepo(db)
-  const destinations = makeDestinationsRepo(db)
   const meta = makeMetaRepo(db)
+  const destinations = makeDestinationsRepo(db)
 
   const cutoffIso = new Date(
     clock().getTime() - config.checkRetentionDays * 24 * 60 * 60 * 1_000,
@@ -56,13 +58,23 @@ async function main(): Promise<void> {
   if (removed > 0) logger.info(`Đã dọn ${removed} dòng checks cũ hơn ${cutoffIso}`)
 
   const client = createClient()
-  const notifier = makeDiscordNotifier({ client, logger })
+  const dispatcher = makeDispatcher({
+    notifiers: [makeDiscordNotifier({ client, logger })],
+    logger,
+  })
+  const routing = makeRouting({
+    destinations,
+    config,
+    // Phase 2 thay bằng hàm đọc messenger_identities.
+    messengerAdminPsids: () => [],
+  })
   const runner = makeRunner({
     probe: makeHttpProbe(),
     targets,
     checks,
     incidents,
-    notifier,
+    dispatcher,
+    routing,
     config,
     clock,
     logger,
@@ -72,7 +84,8 @@ async function main(): Promise<void> {
     checks,
     incidents,
     meta,
-    notifier,
+    dispatcher,
+    routing,
     config,
     clock,
     logger,
