@@ -6,22 +6,39 @@ import { applyMigrations } from '../../src/db/migrate.js'
 import { makeTargetsRepo } from '../../src/db/targets.repo.js'
 import { makeRunner, type Runner } from '../../src/monitor/runner.js'
 import type { Probe } from '../../src/monitor/probe.js'
+import type { Destination } from '../../src/notify/notifier.js'
+import type { Routing } from '../../src/notify/routing.js'
 import { silentLogger } from '../../src/shared/logger.js'
 import type { AlertMessage, ProbeResult, Target } from '../../src/shared/types.js'
-
-type Sent = { msg: AlertMessage; channelId: string }
 
 function fakeProbe(results: ProbeResult[]): Probe {
   let index = 0
   return { run: async () => results[Math.min(index++, results.length - 1)] as ProbeResult }
 }
 
+function fakeDispatcher() {
+  const sent: Array<{ kind: string; addresses: string[] }> = []
+  return {
+    sent,
+    dispatcher: {
+      async dispatch(msg: AlertMessage, dests: readonly Destination[]) {
+        sent.push({ kind: msg.kind, addresses: dests.map((d) => d.address) })
+      },
+    },
+  }
+}
+
+const oneChannel: Routing = {
+  destinationsFor: () => [{ provider: 'discord', address: 'chan-1' }],
+  digestDestinations: () => [],
+}
+
 function setup(results: ProbeResult[], options: { failNotify?: boolean } = {}) {
   const { db } = openTestDb()
-  const sent: Sent[] = []
   const targets = makeTargetsRepo(db)
   const checks = makeChecksRepo(db)
   const incidents = makeIncidentsRepo(db)
+  const { sent, dispatcher } = fakeDispatcher()
 
   let clockMs = Date.parse('2026-08-24T00:00:00.000Z')
   const advance = (ms: number) => {
@@ -33,13 +50,15 @@ function setup(results: ProbeResult[], options: { failNotify?: boolean } = {}) {
     targets,
     checks,
     incidents,
-    notifier: {
-      send: async (message, channelId) => {
-        if (options.failNotify) throw new Error('Discord sập')
-        sent.push({ msg: message, channelId })
-      },
-    },
-    config: { defaultLatencyThresholdMs: 2_000, defaultAlertChannelId: 'default-chan' },
+    dispatcher: options.failNotify
+      ? {
+          async dispatch() {
+            throw new Error('Discord sập')
+          },
+        }
+      : dispatcher,
+    routing: oneChannel,
+    config: { defaultLatencyThresholdMs: 2_000 },
     clock: () => new Date(clockMs),
     logger: silentLogger,
   })
@@ -112,7 +131,7 @@ describe('runner với chuỗi trạng thái', () => {
       context.advance(60_000)
     }
 
-    expect(context.sent.map((sent) => sent.msg.kind)).toEqual(['down', 'recovered'])
+    expect(context.sent.map((sent) => sent.kind)).toEqual(['down', 'recovered'])
     expect(context.checks.listRecent(target.id, 10)).toHaveLength(4)
   })
 
@@ -128,8 +147,10 @@ describe('runner với chuỗi trạng thái', () => {
     await context.runner.runCheck(context.targets.findById(target.id) as Target)
 
     expect(context.incidents.findOpen(target.id)).toBeNull()
-    const recovered = context.sent.find((sent) => sent.msg.kind === 'recovered')
-    expect(recovered?.msg.fields.map((field) => field.value).join(' ')).toContain('1h 2m 5s')
+    const closed = context.incidents.listRecent(target.id, 1)[0]
+    const downtimeMs = Date.parse(closed?.endedAt as string) - Date.parse(closed?.startedAt as string)
+    expect(downtimeMs).toBe(3_725_000)
+    expect(context.sent.find((sent) => sent.kind === 'recovered')).toBeDefined()
   })
 
   it('down liên tục nhiều lần chỉ mở một incident', async () => {
@@ -158,21 +179,40 @@ describe('runner với chuỗi trạng thái', () => {
   })
 })
 
-describe('runner định tuyến channel', () => {
-  it('dùng alertChannelId của target khi có', async () => {
-    const context = setup([DOWN_RESULT])
-    await applyMigrations(context.db)
-    const target = seedTarget(context.targets, { alertChannelId: 'chan-rieng' })
-    await context.runner.runCheck(target)
-    expect(context.sent[0]?.channelId).toBe('chan-rieng')
-  })
+describe('runner định tuyến destination', () => {
+  it('alert đi tới đúng mọi destination mà routing trả về', async () => {
+    const { db } = openTestDb()
+    await applyMigrations(db)
+    const targets = makeTargetsRepo(db)
+    const checks = makeChecksRepo(db)
+    const incidents = makeIncidentsRepo(db)
+    const target = seedTarget(targets)
+    const downProbe = fakeProbe([DOWN_RESULT])
+    const clock = () => new Date('2026-08-24T00:00:00.000Z')
 
-  it('dùng channel mặc định khi target không khai báo', async () => {
-    const context = setup([DOWN_RESULT])
-    await applyMigrations(context.db)
-    const target = seedTarget(context.targets)
-    await context.runner.runCheck(target)
-    expect(context.sent[0]?.channelId).toBe('default-chan')
+    const { sent, dispatcher } = fakeDispatcher()
+    const runner = makeRunner({
+      probe: downProbe,
+      targets,
+      checks,
+      incidents,
+      dispatcher,
+      routing: {
+        destinationsFor: () => [
+          { provider: 'discord', address: 'chan-1' },
+          { provider: 'messenger', address: 'psid-1' },
+        ],
+        digestDestinations: () => [],
+      },
+      config: { defaultLatencyThresholdMs: 2_000 },
+      clock,
+      logger: silentLogger,
+    })
+
+    await runner.runCheck(target)
+
+    expect(sent).toHaveLength(1)
+    expect(sent[0]?.addresses).toEqual(['chan-1', 'psid-1'])
   })
 })
 

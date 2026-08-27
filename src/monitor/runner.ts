@@ -3,7 +3,8 @@ import type { ChecksRepo } from '../db/checks.repo.js'
 import type { IncidentsRepo } from '../db/incidents.repo.js'
 import type { TargetsRepo } from '../db/targets.repo.js'
 import { downMessage, reasonOf, recoveredMessage } from '../notify/messages.js'
-import type { Notifier } from '../notify/notifier.js'
+import type { Dispatcher } from '../notify/notifier.js'
+import type { Routing } from '../notify/routing.js'
 import type { Logger } from '../shared/logger.js'
 import type { Clock } from '../shared/time.js'
 import type { AlertMessage, CheckOutcome, Target } from '../shared/types.js'
@@ -16,8 +17,9 @@ export type RunnerDeps = {
   targets: TargetsRepo
   checks: ChecksRepo
   incidents: IncidentsRepo
-  notifier: Notifier
-  config: Pick<AppConfig, 'defaultLatencyThresholdMs' | 'defaultAlertChannelId'>
+  dispatcher: Dispatcher
+  routing: Routing
+  config: Pick<AppConfig, 'defaultLatencyThresholdMs'>
   clock: Clock
   logger: Logger
 }
@@ -28,14 +30,12 @@ export type Runner = {
 }
 
 export function makeRunner(deps: RunnerDeps): Runner {
-  const channelOf = (target: Target): string =>
-    target.alertChannelId ?? deps.config.defaultAlertChannelId
-
-  async function notifySafe(message: AlertMessage, channelId: string): Promise<void> {
+  async function notifySafe(message: AlertMessage, target: Target): Promise<void> {
     try {
-      await deps.notifier.send(message, channelId)
+      await deps.dispatcher.dispatch(message, deps.routing.destinationsFor(target.id))
     } catch (error) {
-      deps.logger.error(`Không gửi được alert vào channel ${channelId}`, error)
+      // dispatcher đã cô lập lỗi từng destination; đây là chốt cuối cho lỗi ngoài dự kiến.
+      deps.logger.error(`Không gửi được alert cho ${target.name}`, error)
     }
   }
 
@@ -57,12 +57,12 @@ export function makeRunner(deps: RunnerDeps): Runner {
 
     if (transition?.kind === 'down') {
       deps.incidents.open(target.id, reasonOf(result), at)
-      await notifySafe(downMessage(target, result, at), channelOf(target))
+      await notifySafe(downMessage(target, result, at), target)
     } else if (transition?.kind === 'recovered') {
       const open = deps.incidents.findOpen(target.id)
       deps.incidents.close(target.id, at)
       const downtimeMs = open ? Date.parse(at) - Date.parse(open.startedAt) : 0
-      await notifySafe(recoveredMessage(target, downtimeMs, at), channelOf(target))
+      await notifySafe(recoveredMessage(target, downtimeMs, at), target)
     }
 
     deps.targets.updateStatus(target.id, status, at)
