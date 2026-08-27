@@ -2,14 +2,17 @@ import { describe, expect, it } from 'bun:test'
 import { allCommands } from '../../../src/bot/commands/index.js'
 
 describe('allCommands', () => {
-  it('đăng ký đủ 9 lệnh', () => {
-    expect(allCommands()).toHaveLength(9)
+  it('đăng ký đủ 12 lệnh', () => {
+    expect(allCommands()).toHaveLength(12)
   })
 
   it('có đúng tập tên lệnh mong đợi', () => {
     expect(allCommands().map((command) => command.name).sort()).toEqual([
       'add',
       'check',
+      'dest-add',
+      'dest-list',
+      'dest-remove',
       'history',
       'list',
       'pause',
@@ -32,12 +35,12 @@ describe('allCommands', () => {
     }
   })
 
-  it('chỉ add, remove, pause, resume là lệnh admin', () => {
+  it('chỉ add, remove, pause, resume, dest-add, dest-remove là lệnh admin', () => {
     const admin = allCommands()
       .filter((command) => command.adminOnly)
       .map((command) => command.name)
       .sort()
-    expect(admin).toEqual(['add', 'pause', 'remove', 'resume'])
+    expect(admin).toEqual(['add', 'dest-add', 'dest-remove', 'pause', 'remove', 'resume'])
   })
 
   it('mọi lệnh đều có execute là hàm', () => {
