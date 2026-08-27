@@ -67,3 +67,27 @@ export const meta = sqliteTable('meta', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
 })
+
+export const messengerIdentities = sqliteTable('messenger_identities', {
+  psid: text('psid').primaryKey(),
+  discordUserId: text('discord_user_id'),
+  isAdmin: integer('is_admin').notNull().default(0),
+  lastInboundAt: text('last_inbound_at'),
+  linkedAt: text('linked_at'),
+})
+
+export const messengerLinkCodes = sqliteTable('messenger_link_codes', {
+  code: text('code').primaryKey(),
+  discordUserId: text('discord_user_id').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  usedAt: text('used_at'),
+})
+
+export const messengerSeenMids = sqliteTable(
+  'messenger_seen_mids',
+  {
+    mid: text('mid').primaryKey(),
+    seenAt: text('seen_at').notNull(),
+  },
+  (t) => [index('idx_messenger_seen_mids_time').on(t.seenAt)],
+)
